@@ -57,7 +57,7 @@ export const Unlock = () => {
     callbackRoute: RouteNamesEnum.dashboard,
     nativeAuth,
     onLoginRedirect: () => {
-      navigate(RouteNamesEnum.dashboard);
+      navigate(RouteNamesEnum.tickets);
     },
     disabled: isLoading
   };
