@@ -1,6 +1,7 @@
 import { RouteNamesEnum } from 'localConstants';
 import { Dashboard, Disclaimer, Home } from 'pages';
 import AvailableTicketsPage from 'pages/Tickets/AvailableTickets';
+import { Validate } from 'pages/Validate';
 import { RouteType } from 'types';
 
 interface RouteWithTitleType extends RouteType {
@@ -15,7 +16,7 @@ export const routes: RouteWithTitleType[] = [
   },
   {
     path: RouteNamesEnum.dashboard,
-    title: 'Dashboard',
+    title: 'My Tickets',
     component: Dashboard
   },
   {
@@ -25,7 +26,12 @@ export const routes: RouteWithTitleType[] = [
   },
   {
     path: RouteNamesEnum.tickets,
-    title: 'Tickets',
+    title: 'Events',
     component: AvailableTicketsPage
+  },
+  {
+    path: RouteNamesEnum.validate,
+    title: 'Validate Tickets',
+    component: Validate
   }
 ];
