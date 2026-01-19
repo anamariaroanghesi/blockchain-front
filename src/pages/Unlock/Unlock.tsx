@@ -18,11 +18,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faWallet, 
   faShieldHalved, 
-  faArrowRight,
-  faMobileScreen,
-  faKey,
-  faPuzzlePiece,
-  faGlobe
+  faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
 
 type CommonPropsType =
@@ -42,66 +38,10 @@ export const Unlock = () => {
     }
   };
 
-  // Wallet options with descriptions
-  const walletOptions = [
-    {
-      id: 'xportal',
-      name: 'xPortal App',
-      description: 'Scan QR code with xPortal mobile app',
-      icon: faMobileScreen,
-      recommended: true,
-      component: (
-        <WalletConnectLoginButton
-          loginButtonText='xPortal App'
-          {...commonProps}
-        />
-      )
-    },
-    {
-      id: 'defi',
-      name: 'DeFi Wallet',
-      description: 'Browser extension for MultiversX',
-      icon: faPuzzlePiece,
-      recommended: false,
-      component: (
-        <ExtensionLoginButton
-          loginButtonText='DeFi Wallet'
-          {...commonProps}
-        />
-      )
-    },
-    {
-      id: 'webwallet',
-      name: 'Web Wallet',
-      description: 'Login via MultiversX Web Wallet',
-      icon: faGlobe,
-      recommended: false,
-      component: (
-        <CrossWindowLoginButton
-          loginButtonText='Web Wallet'
-          {...commonProps}
-        />
-      )
-    },
-    {
-      id: 'ledger',
-      name: 'Ledger',
-      description: 'Connect with hardware wallet',
-      icon: faKey,
-      recommended: false,
-      component: (
-        <LedgerLoginButton
-          loginButtonText='Ledger'
-          {...commonProps}
-        />
-      )
-    }
-  ];
-
   return (
     <AuthRedirectWrapper requireAuth={false}>
       <div className='min-h-[80vh] w-full flex items-center justify-center px-6 py-12'>
-        <div className='w-full max-w-lg mx-auto'>
+        <div className='w-full max-w-md mx-auto'>
           {/* Header */}
           <div className='text-center mb-8'>
             <div className='w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/30'>
@@ -115,40 +55,46 @@ export const Unlock = () => {
 
           {/* Login Options */}
           <div 
-            className='glass-card p-6 space-y-3'
+            className='glass-card p-6'
             data-testid='unlockPage'
           >
-            {walletOptions.map((option) => (
-              <div 
-                key={option.id}
-                className='wallet-login-btn relative'
-              >
-                {option.recommended && (
-                  <span className='absolute -top-2 -right-2 px-2 py-0.5 text-[10px] font-bold uppercase bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full z-10'>
-                    Recommended
-                  </span>
-                )}
-                <div className='wallet-btn-wrapper'>
-                  {option.component}
-                </div>
-                <div className='wallet-btn-overlay'>
-                  <div className='flex items-center gap-4'>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      option.recommended 
-                        ? 'bg-gradient-to-br from-purple-500 to-pink-500' 
-                        : 'bg-white/10'
-                    }`}>
-                      <FontAwesomeIcon icon={option.icon} className='text-xl text-white' />
-                    </div>
-                    <div className='text-left'>
-                      <div className='font-semibold text-white'>{option.name}</div>
-                      <div className='text-sm text-white/50'>{option.description}</div>
-                    </div>
-                  </div>
-                  <FontAwesomeIcon icon={faArrowRight} className='text-white/40' />
-                </div>
+            {/* Recommended - xPortal */}
+            <div className='mb-4'>
+              <div className='text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2'>
+                📱 Recommended
               </div>
-            ))}
+              <WalletConnectLoginButton
+                loginButtonText='xPortal App'
+                {...commonProps}
+              />
+              <p className='text-xs text-white/40 mt-1 ml-1'>
+                Scan QR code with xPortal mobile app
+              </p>
+            </div>
+
+            <div className='border-t border-white/10 my-4' />
+
+            {/* Other Options */}
+            <div className='text-xs text-white/50 font-semibold uppercase tracking-wider mb-3'>
+              Other Options
+            </div>
+            
+            <div className='space-y-2'>
+              <ExtensionLoginButton
+                loginButtonText='🧩 DeFi Wallet Extension'
+                {...commonProps}
+              />
+              
+              <CrossWindowLoginButton
+                loginButtonText='🌐 MultiversX Web Wallet'
+                {...commonProps}
+              />
+              
+              <LedgerLoginButton
+                loginButtonText='🔐 Ledger Hardware Wallet'
+                {...commonProps}
+              />
+            </div>
           </div>
 
           {/* Security notice */}
@@ -157,7 +103,7 @@ export const Unlock = () => {
             <div>
               <p className='text-emerald-300 text-sm font-medium'>Secure Connection</p>
               <p className='text-emerald-300/70 text-xs mt-1'>
-                Your wallet credentials never leave your device. We only request read access to your public address.
+                Your private keys never leave your wallet. We only request permission to view your public address.
               </p>
             </div>
           </div>
@@ -165,19 +111,19 @@ export const Unlock = () => {
           {/* Help text */}
           <div className='mt-6 text-center'>
             <p className='text-white/40 text-sm'>
-              New to MultiversX?{' '}
+              Don't have a wallet?{' '}
               <a 
                 href='https://xportal.com' 
                 target='_blank' 
                 rel='noopener noreferrer'
                 className='text-purple-400 hover:text-purple-300 transition-colors'
               >
-                Get xPortal Wallet
+                Download xPortal
                 <FontAwesomeIcon icon={faArrowRight} className='ml-1 text-xs' />
               </a>
             </p>
             <p className='text-white/30 text-xs mt-2'>
-              Using <span className='text-purple-400'>MultiversX Testnet</span> for this demo
+              This app uses <span className='text-purple-400'>MultiversX Testnet</span>
             </p>
           </div>
         </div>
