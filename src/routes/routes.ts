@@ -1,7 +1,9 @@
 import { RouteNamesEnum } from 'localConstants';
-import { Dashboard, Disclaimer, Home } from 'pages';
+import { Dashboard, Disclaimer, Home, Validate } from 'pages';
+import { FestivalInfo } from 'pages/Festival';
 import AvailableTicketsPage from 'pages/Tickets/AvailableTickets';
-import { Validate } from 'pages/Validate';
+import { ResaleMarketplace } from 'pages/Resale';
+import { CheckIn } from 'pages/CheckIn';
 import { RouteType } from 'types';
 
 interface RouteWithTitleType extends RouteType {
@@ -13,6 +15,11 @@ export const routes: RouteWithTitleType[] = [
     path: RouteNamesEnum.home,
     title: 'Home',
     component: Home
+  },
+  {
+    path: RouteNamesEnum.festival,
+    title: 'Festival Info',
+    component: FestivalInfo
   },
   {
     path: RouteNamesEnum.dashboard,
@@ -28,6 +35,16 @@ export const routes: RouteWithTitleType[] = [
     path: RouteNamesEnum.tickets,
     title: 'Events',
     component: AvailableTicketsPage
+  },
+  {
+    path: RouteNamesEnum.resale,
+    title: 'Resale Marketplace',
+    component: ResaleMarketplace
+  },
+  {
+    path: RouteNamesEnum.checkin,
+    title: 'Check-In',
+    component: CheckIn
   },
   {
     path: RouteNamesEnum.validate,

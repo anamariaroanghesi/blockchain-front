@@ -1,0 +1,2 @@
+export { FestivalInfo } from './FestivalInfo';
+

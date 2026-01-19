@@ -4,3 +4,6 @@ export * from './Home';
 export * from './PageNotFound';
 export * from './Unlock';
 export * from './Validate';
+export * from './Festival';
+export * from './Resale';
+export * from './CheckIn';

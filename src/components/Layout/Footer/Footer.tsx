@@ -64,18 +64,23 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to={RouteNamesEnum.festival} className='text-white/50 hover:text-white transition-colors text-sm'>
+                  Festival Info
+                </Link>
+              </li>
+              <li>
                 <Link to={RouteNamesEnum.tickets} className='text-white/50 hover:text-white transition-colors text-sm'>
-                  Browse Events
+                  Buy Tickets
                 </Link>
               </li>
               <li>
-                <Link to={RouteNamesEnum.dashboard} className='text-white/50 hover:text-white transition-colors text-sm'>
-                  My Tickets
+                <Link to={RouteNamesEnum.resale} className='text-white/50 hover:text-white transition-colors text-sm'>
+                  Resale Marketplace
                 </Link>
               </li>
               <li>
-                <Link to={RouteNamesEnum.validate} className='text-white/50 hover:text-white transition-colors text-sm'>
-                  Validate Tickets
+                <Link to={RouteNamesEnum.checkin} className='text-white/50 hover:text-white transition-colors text-sm'>
+                  Check-In
                 </Link>
               </li>
             </ul>
@@ -104,6 +109,11 @@ export const Footer = () => {
                 >
                   Block Explorer
                 </a>
+              </li>
+              <li>
+                <Link to={RouteNamesEnum.validate} className='text-white/50 hover:text-white transition-colors text-sm'>
+                  Validate Tickets
+                </Link>
               </li>
               <li>
                 <Link to={RouteNamesEnum.disclaimer} className='text-white/50 hover:text-white transition-colors text-sm'>

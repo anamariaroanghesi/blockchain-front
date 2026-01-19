@@ -15,7 +15,10 @@ import {
   faTimes,
   faShieldHalved,
   faHome,
-  faCheckCircle
+  faCheckCircle,
+  faMusic,
+  faExchangeAlt,
+  faQrcode
 } from '@fortawesome/free-solid-svg-icons';
 
 const callbackUrl = `${window.location.origin}/unlock`;
@@ -45,10 +48,12 @@ export const Header = () => {
 
   const navItems = [
     { path: RouteNamesEnum.home, label: 'Home', icon: faHome },
-    { path: RouteNamesEnum.tickets, label: 'Events', icon: faTicket },
+    { path: RouteNamesEnum.festival, label: 'Festival', icon: faMusic },
+    { path: RouteNamesEnum.tickets, label: 'Buy Tickets', icon: faTicket },
+    { path: RouteNamesEnum.resale, label: 'Resale', icon: faExchangeAlt },
     ...(isLoggedIn ? [
       { path: RouteNamesEnum.dashboard, label: 'My Tickets', icon: faWallet },
-      { path: RouteNamesEnum.validate, label: 'Validate', icon: faShieldHalved },
+      { path: RouteNamesEnum.checkin, label: 'Check-In', icon: faQrcode },
     ] : [])
   ];
 
@@ -73,18 +78,18 @@ export const Header = () => {
           </MxLink>
 
           {/* Desktop Navigation */}
-          <nav className='hidden md:flex items-center gap-1'>
+          <nav className='hidden lg:flex items-center gap-1'>
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                className={`px-3 py-2 rounded-xl flex items-center gap-2 transition-all text-sm ${
                   isActivePath(item.path)
                     ? 'bg-white/10 text-white'
                     : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <FontAwesomeIcon icon={item.icon} className='text-sm' />
+                <FontAwesomeIcon icon={item.icon} className='text-xs' />
                 {item.label}
               </Link>
             ))}
@@ -126,7 +131,7 @@ export const Header = () => {
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className='md:hidden p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors'
+              className='lg:hidden p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors'
             >
               <FontAwesomeIcon icon={mobileMenuOpen ? faTimes : faBars} />
             </button>
@@ -135,7 +140,7 @@ export const Header = () => {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className='md:hidden mt-4 pt-4 border-t border-white/10 animate-slide-down'>
+          <nav className='lg:hidden mt-4 pt-4 border-t border-white/10 animate-slide-down'>
             <div className='flex flex-col gap-2'>
               {navItems.map((item) => (
                 <Link
