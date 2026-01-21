@@ -6,4 +6,3 @@ export { AbiRegistry } from '@multiversx/sdk-core/out/smartcontracts/typesystem/
 export { SignableMessage } from '@multiversx/sdk-core/out/signableMessage';
 export { AddressValue } from '@multiversx/sdk-core/out/smartcontracts/typesystem/address';
 export { TokenTransfer } from '@multiversx/sdk-core/out';
-export { ProxyNetworkProvider } from '@multiversx/sdk-core/out';

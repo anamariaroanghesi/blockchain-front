@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { AuthRedirectWrapper } from 'wrappers';
 import { useScrollToElement } from 'hooks';
 import { useGetAccountInfo } from 'hooks/sdkDappHooks';
-import { mockOwnedTickets } from 'data/mockEvents';
-import { OwnedTicket } from 'types/ticket.types';
+import { useUserTickets } from 'hooks/festival/useUserTickets';
+import { useFestivalData } from 'hooks/festival/useFestivalContract';
+import { OwnedTicketNFT } from 'types/festival.types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faWallet,
@@ -13,19 +14,26 @@ import {
   faMapMarkerAlt,
   faCopy,
   faCheckCircle,
-  faTimesCircle,
   faExternalLinkAlt,
   faHistory,
   faTimes,
   faShieldHalved,
-  faExpand
+  faSpinner,
+  faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
 import { Link } from 'react-router-dom';
 import { RouteNamesEnum } from 'localConstants';
+import { environment } from 'config';
 
 const formatAddress = (address: string) => {
   if (!address) return '';
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
+};
+
+const getExplorerUrl = () => {
+  return environment === 'devnet' 
+    ? 'https://devnet-explorer.multiversx.com'
+    : 'https://testnet-explorer.multiversx.com';
 };
 
 const AccountWidget = () => {
@@ -82,7 +90,7 @@ const AccountWidget = () => {
         {/* Quick links */}
         <div className="flex gap-2">
           <a 
-            href={`https://testnet-explorer.multiversx.com/accounts/${address}`}
+            href={`${getExplorerUrl()}/accounts/${address}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-center text-sm"
@@ -91,7 +99,7 @@ const AccountWidget = () => {
             Explorer
           </a>
           <a 
-            href={`https://testnet-explorer.multiversx.com/accounts/${address}/transactions`}
+            href={`${getExplorerUrl()}/accounts/${address}/transactions`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-center text-sm"
@@ -105,40 +113,22 @@ const AccountWidget = () => {
   );
 };
 
-const TicketCard = ({ ticket, onViewQR }: { ticket: OwnedTicket; onViewQR: () => void }) => {
-  const isExpired = new Date(ticket.eventDate) < new Date();
-  
+const TicketCard = ({ ticket, onViewQR }: { ticket: OwnedTicketNFT; onViewQR: () => void }) => {
   return (
-    <div className={`ticket-card overflow-hidden ${ticket.isUsed ? 'opacity-60' : ''}`}>
+    <div className="ticket-card overflow-hidden">
       <div className="flex flex-col md:flex-row">
-        {/* Left side - Image */}
-        <div className="relative w-full md:w-48 h-40 md:h-auto flex-shrink-0">
-          <img 
-            src={ticket.imageUrl} 
-            alt={ticket.eventName}
-            className="w-full h-full object-cover"
-          />
+        {/* Left side - Ticket Visual */}
+        <div className="relative w-full md:w-48 h-40 md:h-auto flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+          <FontAwesomeIcon icon={faTicket} className="text-6xl text-white/30" />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-dark-800/90 hidden md:block" />
           <div className="absolute inset-0 bg-gradient-to-t from-dark-800/90 to-transparent md:hidden" />
           
           {/* Status badge */}
           <div className="absolute top-3 left-3">
-            {ticket.isUsed ? (
-              <span className="badge-danger flex items-center gap-1">
-                <FontAwesomeIcon icon={faTimesCircle} className="text-xs" />
-                Used
-              </span>
-            ) : isExpired ? (
-              <span className="badge-warning flex items-center gap-1">
-                <FontAwesomeIcon icon={faTimesCircle} className="text-xs" />
-                Expired
-              </span>
-            ) : (
-              <span className="badge-success flex items-center gap-1">
-                <FontAwesomeIcon icon={faCheckCircle} className="text-xs" />
-                Valid
-              </span>
-            )}
+            <span className="badge-success flex items-center gap-1">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-xs" />
+              Valid
+            </span>
           </div>
         </div>
 
@@ -146,46 +136,35 @@ const TicketCard = ({ ticket, onViewQR }: { ticket: OwnedTicket; onViewQR: () =>
         <div className="flex-1 p-5">
           <div className="flex justify-between items-start mb-3">
             <div>
-              <h3 className="text-lg font-bold mb-1">{ticket.eventName}</h3>
-              <span className="badge-primary text-xs">{ticket.ticketType}</span>
+              <h3 className="text-lg font-bold mb-1">{ticket.name || 'Festival Ticket'}</h3>
+              <span className="badge-primary text-xs">NFT #{ticket.nonce}</span>
             </div>
           </div>
 
           <div className="space-y-2 mb-4">
             <div className="flex items-center gap-2 text-white/60 text-sm">
-              <FontAwesomeIcon icon={faCalendar} className="text-purple-400" />
-              <span>{new Date(ticket.eventDate).toLocaleDateString('en-US', { 
-                weekday: 'short',
-                month: 'short', 
-                day: 'numeric',
-                year: 'numeric'
-              })} at {ticket.eventTime}</span>
+              <FontAwesomeIcon icon={faTicket} className="text-purple-400" />
+              <span>Token: {ticket.tokenId}</span>
             </div>
-            <div className="flex items-center gap-2 text-white/60 text-sm">
-              <FontAwesomeIcon icon={faMapMarkerAlt} className="text-pink-400" />
-              <span>{ticket.venue}</span>
-            </div>
-            {ticket.seatInfo && (
+            {ticket.attributes && (
               <div className="flex items-center gap-2 text-white/60 text-sm">
-                <FontAwesomeIcon icon={faTicket} className="text-emerald-400" />
-                <span>{ticket.seatInfo}</span>
+                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-pink-400" />
+                <span>Attributes: {ticket.attributes}</span>
               </div>
             )}
           </div>
 
           <div className="flex justify-between items-center pt-4 border-t border-white/10">
             <div className="font-mono text-xs text-white/40">
-              {ticket.tokenId}
+              Nonce: {ticket.nonce}
             </div>
-            {!ticket.isUsed && !isExpired && (
-              <button
-                onClick={onViewQR}
-                className="btn-primary py-2 px-4 text-sm flex items-center gap-2"
-              >
-                <FontAwesomeIcon icon={faQrcode} />
-                Show QR
-              </button>
-            )}
+            <button
+              onClick={onViewQR}
+              className="btn-primary py-2 px-4 text-sm flex items-center gap-2"
+            >
+              <FontAwesomeIcon icon={faQrcode} />
+              Show QR
+            </button>
           </div>
         </div>
       </div>
@@ -193,10 +172,7 @@ const TicketCard = ({ ticket, onViewQR }: { ticket: OwnedTicket; onViewQR: () =>
   );
 };
 
-const QRModal = ({ ticket, onClose }: { ticket: OwnedTicket; onClose: () => void }) => {
-  // Generate a simple QR-like pattern (in production, use a real QR library)
-  const qrData = `TICKET:${ticket.tokenId}|EVENT:${ticket.eventId}|TYPE:${ticket.ticketType}`;
-  
+const QRModal = ({ ticket, onClose }: { ticket: OwnedTicketNFT; onClose: () => void }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -215,10 +191,10 @@ const QRModal = ({ ticket, onClose }: { ticket: OwnedTicket; onClose: () => void
           <FontAwesomeIcon icon={faTimes} />
         </button>
 
-        <h3 className="text-2xl font-bold mb-2">{ticket.eventName}</h3>
-        <p className="text-white/50 mb-6">{ticket.ticketType}</p>
+        <h3 className="text-2xl font-bold mb-2">{ticket.name || 'Festival Ticket'}</h3>
+        <p className="text-white/50 mb-6">NFT #{ticket.nonce}</p>
 
-        {/* QR Code placeholder - in production use react-qr-code or similar */}
+        {/* QR Code placeholder */}
         <div className="bg-white p-6 rounded-2xl inline-block mb-6">
           <div className="w-48 h-48 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center relative overflow-hidden">
             {/* Simulated QR pattern */}
@@ -239,17 +215,17 @@ const QRModal = ({ ticket, onClose }: { ticket: OwnedTicket; onClose: () => void
         <div className="space-y-3 text-left">
           <div className="p-3 rounded-xl bg-white/5 border border-white/10">
             <div className="text-white/50 text-xs">Token ID</div>
-            <div className="font-mono text-sm">{ticket.tokenId}</div>
+            <div className="font-mono text-sm break-all">{ticket.tokenId}</div>
           </div>
           
           <div className="flex gap-3">
             <div className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10">
-              <div className="text-white/50 text-xs">Date</div>
-              <div className="text-sm">{ticket.eventDate}</div>
+              <div className="text-white/50 text-xs">Nonce</div>
+              <div className="text-sm">{ticket.nonce}</div>
             </div>
             <div className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10">
-              <div className="text-white/50 text-xs">Time</div>
-              <div className="text-sm">{ticket.eventTime}</div>
+              <div className="text-white/50 text-xs">Balance</div>
+              <div className="text-sm">{ticket.balance}</div>
             </div>
           </div>
         </div>
@@ -260,24 +236,29 @@ const QRModal = ({ ticket, onClose }: { ticket: OwnedTicket; onClose: () => void
             This ticket is verified on the blockchain
           </span>
         </div>
+
+        <Link 
+          to={RouteNamesEnum.checkin}
+          className="btn-primary w-full mt-4 flex items-center justify-center gap-2"
+        >
+          <FontAwesomeIcon icon={faQrcode} />
+          Go to Check-In
+        </Link>
       </div>
     </div>
   );
 };
 
-const StatsWidget = () => {
-  const totalTickets = mockOwnedTickets.length;
-  const usedTickets = mockOwnedTickets.filter(t => t.isUsed).length;
-  const activeTickets = totalTickets - usedTickets;
-  const totalSpent = mockOwnedTickets.reduce((sum, t) => sum + parseFloat(t.purchasePrice), 0);
+const StatsWidget = ({ tickets }: { tickets: OwnedTicketNFT[] }) => {
+  const totalTickets = tickets.length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[
         { label: 'Total Tickets', value: totalTickets, icon: faTicket, color: 'from-purple-500 to-indigo-500' },
-        { label: 'Active', value: activeTickets, icon: faCheckCircle, color: 'from-emerald-500 to-teal-500' },
-        { label: 'Used', value: usedTickets, icon: faHistory, color: 'from-amber-500 to-orange-500' },
-        { label: 'Total Spent', value: `${totalSpent.toFixed(2)} EGLD`, icon: faWallet, color: 'from-pink-500 to-rose-500' }
+        { label: 'Active', value: totalTickets, icon: faCheckCircle, color: 'from-emerald-500 to-teal-500' },
+        { label: 'Used', value: 0, icon: faHistory, color: 'from-amber-500 to-orange-500' },
+        { label: 'NFTs Owned', value: totalTickets, icon: faWallet, color: 'from-pink-500 to-rose-500' }
       ].map((stat, i) => (
         <div key={i} className="glass-card p-4">
           <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
@@ -293,14 +274,9 @@ const StatsWidget = () => {
 
 export const Dashboard = () => {
   useScrollToElement();
-  const [selectedTicket, setSelectedTicket] = useState<OwnedTicket | null>(null);
-  const [filter, setFilter] = useState<'all' | 'active' | 'used'>('all');
-
-  const filteredTickets = mockOwnedTickets.filter(ticket => {
-    if (filter === 'active') return !ticket.isUsed;
-    if (filter === 'used') return ticket.isUsed;
-    return true;
-  });
+  const { tickets, isLoading, refetch } = useUserTickets();
+  const { festivalData } = useFestivalData();
+  const [selectedTicket, setSelectedTicket] = useState<OwnedTicketNFT | null>(null);
 
   return (
     <AuthRedirectWrapper>
@@ -318,7 +294,7 @@ export const Dashboard = () => {
 
           {/* Stats */}
           <div className="mb-8">
-            <StatsWidget />
+            <StatsWidget tickets={tickets} />
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
@@ -333,35 +309,32 @@ export const Dashboard = () => {
                 <h2 className="text-2xl font-bold flex items-center gap-3">
                   <FontAwesomeIcon icon={faTicket} className="text-purple-400" />
                   My Tickets
+                  {festivalData && (
+                    <span className="text-sm font-normal text-white/50">
+                      for {festivalData.name}
+                    </span>
+                  )}
                 </h2>
 
-                {/* Filter tabs */}
-                <div className="flex gap-2 bg-white/5 p-1 rounded-xl">
-                  {[
-                    { value: 'all', label: 'All' },
-                    { value: 'active', label: 'Active' },
-                    { value: 'used', label: 'Used' }
-                  ].map((tab) => (
-                    <button
-                      key={tab.value}
-                      onClick={() => setFilter(tab.value as typeof filter)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filter === tab.value
-                          ? 'bg-purple-500 text-white'
-                          : 'text-white/60 hover:text-white'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  onClick={refetch}
+                  className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+                >
+                  <FontAwesomeIcon icon={faHistory} />
+                  Refresh
+                </button>
               </div>
 
-              {filteredTickets.length > 0 ? (
+              {isLoading ? (
+                <div className="glass-card p-12 text-center">
+                  <FontAwesomeIcon icon={faSpinner} className="text-4xl text-purple-400 animate-spin mb-4" />
+                  <p className="text-white/60">Loading your tickets from blockchain...</p>
+                </div>
+              ) : tickets.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredTickets.map((ticket) => (
+                  {tickets.map((ticket) => (
                     <TicketCard 
-                      key={ticket.id} 
+                      key={`${ticket.tokenId}-${ticket.nonce}`} 
                       ticket={ticket} 
                       onViewQR={() => setSelectedTicket(ticket)}
                     />
@@ -372,13 +345,12 @@ export const Dashboard = () => {
                   <div className="text-6xl mb-4">🎫</div>
                   <h3 className="text-xl font-semibold mb-2">No tickets found</h3>
                   <p className="text-white/50 mb-6">
-                    {filter === 'all' 
-                      ? "You haven't purchased any tickets yet" 
-                      : `No ${filter} tickets`}
+                    You don't have any NFT tickets in your wallet yet
                   </p>
                   <Link to={RouteNamesEnum.tickets} className="btn-primary inline-flex items-center gap-2">
                     <FontAwesomeIcon icon={faTicket} />
-                    Browse Events
+                    Buy Tickets
+                    <FontAwesomeIcon icon={faArrowRight} />
                   </Link>
                 </div>
               )}

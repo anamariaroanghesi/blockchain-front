@@ -1,11 +1,9 @@
 /**
  * Ticket Service - API layer for blockchain interactions
- * In production, these would call actual MultiversX API endpoints
+ * Uses MultiversX API endpoints for ticket operations
  */
 
-import { OwnedTicket } from 'types/ticket.types';
-
-const API_BASE = 'https://testnet-api.multiversx.com';
+import { API_URL, contractAddress } from 'config';
 
 // Platform fee percentage for resale (e.g., 5%)
 export const PLATFORM_FEE_PERCENT = 5;
@@ -14,21 +12,18 @@ export const ORGANIZER_FEE_PERCENT = 2.5;
 export interface ResaleTicket {
   id: string;
   tokenId: string;
-  eventId: string;
+  nonce: number;
   eventName: string;
-  eventDate: string;
   ticketType: string;
   originalPrice: string;
   resalePrice: string;
   sellerAddress: string;
   listedAt: string;
-  imageUrl: string;
 }
 
 export interface EntryCode {
   code: string;
   ticketId: string;
-  eventId: string;
   walletAddress: string;
   generatedAt: string;
   expiresAt: string;
@@ -41,49 +36,6 @@ export interface PurchaseResult {
   ticketId?: string;
   error?: string;
 }
-
-// Simulated resale listings
-const mockResaleListings: ResaleTicket[] = [
-  {
-    id: 'resale-1',
-    tokenId: 'TICKET-x1y2z3-01',
-    eventId: '1',
-    eventName: 'Electric Dreams Festival 2026',
-    eventDate: '2026-07-15',
-    ticketType: 'VIP Experience',
-    originalPrice: '1.2',
-    resalePrice: '1.5',
-    sellerAddress: 'erd1qqqqqqqqqqqqqpgq...abc123',
-    listedAt: '2026-01-18T10:00:00Z',
-    imageUrl: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800'
-  },
-  {
-    id: 'resale-2',
-    tokenId: 'TICKET-a4b5c6-02',
-    eventId: '1',
-    eventName: 'Electric Dreams Festival 2026',
-    eventDate: '2026-07-15',
-    ticketType: 'General Admission',
-    originalPrice: '0.5',
-    resalePrice: '0.65',
-    sellerAddress: 'erd1qqqqqqqqqqqqqpgq...def456',
-    listedAt: '2026-01-17T14:30:00Z',
-    imageUrl: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800'
-  },
-  {
-    id: 'resale-3',
-    tokenId: 'TICKET-m7n8o9-03',
-    eventId: '3',
-    eventName: 'Taylor Swift - The Eras Tour',
-    eventDate: '2026-06-20',
-    ticketType: 'Standing',
-    originalPrice: '0.6',
-    resalePrice: '0.9',
-    sellerAddress: 'erd1qqqqqqqqqqqqqpgq...ghi789',
-    listedAt: '2026-01-16T09:15:00Z',
-    imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800'
-  }
-];
 
 /**
  * Calculate fees for resale transaction
@@ -106,94 +58,61 @@ export const calculateResaleFees = (resalePrice: number) => {
 };
 
 /**
- * Get all resale listings
- * In production: GET /events/tickets?status=resale
+ * Get NFTs owned by a wallet address
+ * Uses MultiversX API to fetch NFTs
  */
-export const getResaleListings = async (eventId?: string): Promise<ResaleTicket[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  if (eventId) {
-    return mockResaleListings.filter(t => t.eventId === eventId);
+export const getOwnedNFTs = async (walletAddress: string, collection?: string) => {
+  try {
+    let url = `${API_URL}/accounts/${walletAddress}/nfts?size=100`;
+    if (collection) {
+      url += `&collection=${collection}`;
+    }
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Failed to fetch NFTs');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching owned NFTs:', error);
+    return [];
   }
-  return mockResaleListings;
 };
 
 /**
- * List a ticket for resale
- * In production: POST /transactions/list-resale
+ * Get NFT details by identifier
  */
-export const listTicketForResale = async (
-  ticketId: string,
-  price: string,
-  walletAddress: string
-): Promise<PurchaseResult> => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Simulate successful listing
-  return {
-    success: true,
-    transactionHash: `0x${Math.random().toString(16).slice(2, 66)}`
-  };
-};
-
-/**
- * Buy a ticket from resale marketplace
- * In production: POST /transactions/buy-resale
- */
-export const buyResaleTicket = async (
-  resaleId: string,
-  buyerAddress: string
-): Promise<PurchaseResult> => {
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  return {
-    success: true,
-    transactionHash: `0x${Math.random().toString(16).slice(2, 66)}`,
-    ticketId: `TICKET-${Math.random().toString(36).slice(2, 8)}`
-  };
-};
-
-/**
- * Buy ticket directly from organizer
- * In production: POST /transactions/buy-ticket
- */
-export const buyTicketFromOrganizer = async (
-  eventId: string,
-  ticketTypeId: string,
-  quantity: number,
-  buyerAddress: string
-): Promise<PurchaseResult> => {
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  return {
-    success: true,
-    transactionHash: `0x${Math.random().toString(16).slice(2, 66)}`,
-    ticketId: `TICKET-${Math.random().toString(36).slice(2, 8)}`
-  };
+export const getNFTDetails = async (identifier: string) => {
+  try {
+    const response = await fetch(`${API_URL}/nfts/${identifier}`);
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching NFT details:', error);
+    return null;
+  }
 };
 
 /**
  * Generate entry code for check-in
- * In production: POST /entry-code
+ * This creates a time-limited code that can be verified
  */
 export const generateEntryCode = async (
   ticketId: string,
-  eventId: string,
   walletAddress: string
 ): Promise<EntryCode> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes expiry
   
-  // Generate a unique code
-  const code = `ENTRY-${eventId}-${ticketId}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  // Generate a unique code with timestamp for verification
+  const code = `ENTRY-${ticketId}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   
   return {
     code,
     ticketId,
-    eventId,
     walletAddress,
     generatedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
@@ -203,25 +122,22 @@ export const generateEntryCode = async (
 
 /**
  * Verify entry code at check-in
- * In production: POST /verify-entry
  */
 export const verifyEntryCode = async (
-  code: string
-): Promise<{ valid: boolean; ticket?: OwnedTicket; error?: string }> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
+  code: string,
+  walletAddress: string
+): Promise<{ valid: boolean; error?: string }> => {
   // Parse the code
   if (!code.startsWith('ENTRY-')) {
     return { valid: false, error: 'Invalid code format' };
   }
   
-  // Check if code is expired (simulated)
   const parts = code.split('-');
   if (parts.length < 4) {
     return { valid: false, error: 'Malformed code' };
   }
   
-  const timestamp = parseInt(parts[3]);
+  const timestamp = parseInt(parts[2]);
   const now = Date.now();
   const fiveMinutes = 5 * 60 * 1000;
   
@@ -229,59 +145,66 @@ export const verifyEntryCode = async (
     return { valid: false, error: 'Code has expired' };
   }
   
-  // In production, verify the wallet owns the ticket on blockchain
-  return {
-    valid: true,
-    ticket: {
-      id: 'verified-ticket',
-      tokenId: parts[2],
-      eventId: parts[1],
-      eventName: 'Electric Dreams Festival 2026',
-      eventDate: '2026-07-15',
-      eventTime: '18:00',
-      venue: 'Arena Națională, Bucharest',
-      ticketType: 'VIP Experience',
-      purchaseDate: '2026-01-10',
-      purchasePrice: '1.2',
-      isUsed: false,
-      qrCode: code,
-      imageUrl: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800'
+  // Verify the wallet owns the ticket on blockchain
+  const ticketId = parts[1];
+  try {
+    const nftDetails = await getNFTDetails(ticketId);
+    if (!nftDetails) {
+      return { valid: false, error: 'Ticket not found on blockchain' };
     }
-  };
-};
-
-/**
- * Get tickets owned by wallet
- * In production: GET /accounts/{address}/nfts?collection=TICKET
- */
-export const getOwnedTickets = async (walletAddress: string): Promise<OwnedTicket[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Return mock data - in production, query MultiversX API
-  const { mockOwnedTickets } = await import('data/mockEvents');
-  return mockOwnedTickets;
-};
-
-/**
- * Search events/tickets using elastic-like query
- * In production: POST /events/search
- */
-export const searchEvents = async (query: {
-  type?: 'event' | 'ticket' | 'resale';
-  eventId?: string;
-  walletAddress?: string;
-  status?: string;
-  limit?: number;
-}) => {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  // In production, this would query the events/search endpoint
-  const { mockEvents } = await import('data/mockEvents');
-  
-  if (query.eventId) {
-    return mockEvents.filter(e => e.id === query.eventId);
+    
+    if (nftDetails.owner !== walletAddress) {
+      return { valid: false, error: 'Wallet does not own this ticket' };
+    }
+    
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, error: 'Failed to verify ticket ownership' };
   }
-  
-  return mockEvents.slice(0, query.limit || 10);
 };
 
+/**
+ * Query smart contract storage
+ */
+export const queryContract = async (funcName: string, args: string[] = []) => {
+  try {
+    const response = await fetch(`${API_URL}/vm-values/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scAddress: contractAddress,
+        funcName,
+        args
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Contract query failed');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error querying contract:', error);
+    return null;
+  }
+};
+
+/**
+ * Get account transactions
+ */
+export const getAccountTransactions = async (address: string, size: number = 20) => {
+  try {
+    const response = await fetch(
+      `${API_URL}/accounts/${address}/transactions?size=${size}&status=success`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch transactions');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    return [];
+  }
+};

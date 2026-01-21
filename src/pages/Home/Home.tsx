@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useGetIsLoggedIn } from 'hooks';
 import { RouteNamesEnum } from 'localConstants';
-import { mockEvents, getCategoryIcon } from 'data/mockEvents';
+import { useFestivalData, useTicketPrices } from 'hooks/festival/useFestivalContract';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faShieldHalved, 
@@ -11,16 +11,28 @@ import {
   faArrowRight,
   faQrcode,
   faGlobe,
-  faLock
+  faLock,
+  faCalendar,
+  faMapMarkerAlt,
+  faUsers,
+  faClock,
+  faMusic
 } from '@fortawesome/free-solid-svg-icons';
+import { formatDate, getAvailabilityPercentage } from 'types/festival.types';
 
 export const Home = () => {
   const isLoggedIn = useGetIsLoggedIn();
-  const featuredEvents = mockEvents.filter(e => e.isFeatured).slice(0, 3);
+  const { festivalData, isLoading } = useFestivalData();
+  const { ticketPrices } = useTicketPrices();
+
+  // Get the lowest ticket price for display
+  const lowestPrice = ticketPrices.length > 0 
+    ? Math.min(...ticketPrices.map(t => parseFloat(t.priceDisplay)))
+    : 0.05;
 
   return (
     <div className="w-full">
-      {/* Hero Section */}
+      {/* Hero Section - Festival Focused */}
       <section className="hero-gradient relative overflow-hidden py-20 px-6">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden">
@@ -34,20 +46,38 @@ export const Home = () => {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm animate-slide-up">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-sm text-white/70">Powered by MultiversX Blockchain</span>
+              <span className="text-sm text-white/70">NFT Tickets on MultiversX Blockchain</span>
             </div>
 
-            {/* Main Title */}
+            {/* Festival Name */}
             <h1 className="text-5xl md:text-7xl font-bold leading-tight animate-slide-up animation-delay-200">
-              <span className="text-white">NFT Ticket</span>
-              <br />
-              <span className="gradient-text">Master</span>
+              <span className="gradient-text">
+                {isLoading ? 'Loading...' : festivalData?.name || 'Electric Dreams Festival'}
+              </span>
             </h1>
+
+            {/* Festival Details */}
+            {festivalData && (
+              <div className="flex flex-wrap justify-center gap-6 text-white/70 animate-slide-up animation-delay-300">
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCalendar} className="text-purple-400" />
+                  <span>{formatDate(festivalData.startTime)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-pink-400" />
+                  <span>Blockchain Arena</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faUsers} className="text-cyan-400" />
+                  <span>{festivalData.maxTickets.toLocaleString()} Capacity</span>
+                </div>
+              </div>
+            )}
 
             {/* Subtitle */}
             <p className="text-xl md:text-2xl text-white/60 max-w-2xl mx-auto animate-slide-up animation-delay-400">
-              The future of event ticketing. Secure, transparent, and fraud-proof tickets 
-              powered by blockchain technology.
+              Secure your spot with blockchain-powered NFT tickets. 
+              No counterfeits, no scalpers, just pure festival vibes.
             </p>
 
             {/* CTA Buttons */}
@@ -56,7 +86,7 @@ export const Home = () => {
                 <>
                   <Link to={RouteNamesEnum.tickets} className="btn-primary flex items-center gap-2 justify-center">
                     <FontAwesomeIcon icon={faTicket} />
-                    Browse Events
+                    Buy Tickets
                     <FontAwesomeIcon icon={faArrowRight} className="text-sm" />
                   </Link>
                   <Link to={RouteNamesEnum.dashboard} className="btn-secondary flex items-center gap-2 justify-center">
@@ -71,9 +101,9 @@ export const Home = () => {
                     Connect Wallet
                     <FontAwesomeIcon icon={faArrowRight} className="text-sm" />
                   </Link>
-                  <Link to={RouteNamesEnum.tickets} className="btn-secondary flex items-center gap-2 justify-center">
-                    <FontAwesomeIcon icon={faTicket} />
-                    Explore Events
+                  <Link to={RouteNamesEnum.festival} className="btn-secondary flex items-center gap-2 justify-center">
+                    <FontAwesomeIcon icon={faMusic} />
+                    Festival Info
                   </Link>
                 </>
               )}
@@ -82,10 +112,22 @@ export const Home = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-12 animate-fade-in animation-delay-600">
               {[
-                { value: '150K+', label: 'Tickets Sold' },
-                { value: '500+', label: 'Events' },
-                { value: '0%', label: 'Fraud Rate' },
-                { value: '50K+', label: 'Users' }
+                { 
+                  value: festivalData ? `${festivalData.soldTickets}` : '0', 
+                  label: 'Tickets Sold' 
+                },
+                { 
+                  value: festivalData ? `${festivalData.maxTickets - festivalData.soldTickets}` : '10000', 
+                  label: 'Available' 
+                },
+                { 
+                  value: `${lowestPrice} EGLD`, 
+                  label: 'Starting Price' 
+                },
+                { 
+                  value: festivalData ? `${Math.round(getAvailabilityPercentage(festivalData))}%` : '100%', 
+                  label: 'Availability' 
+                }
               ].map((stat, i) => (
                 <div key={i} className="text-center">
                   <div className="text-3xl md:text-4xl font-bold gradient-text">{stat.value}</div>
@@ -93,6 +135,93 @@ export const Home = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Ticket Types Preview */}
+      <section className="py-24 px-6 bg-dark-900/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Choose Your <span className="gradient-text">Experience</span>
+            </h2>
+            <p className="text-white/60 text-lg max-w-2xl mx-auto">
+              Select from different ticket tiers to match your festival experience
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {ticketPrices.length > 0 ? ticketPrices.map((ticket, i) => (
+              <div 
+                key={i}
+                className={`glass-card-hover p-8 text-center relative overflow-hidden ${i === 1 ? 'ring-2 ring-purple-500' : ''}`}
+              >
+                {i === 1 && (
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-4 py-1 rounded-bl-lg">
+                    POPULAR
+                  </div>
+                )}
+                <h3 className="text-2xl font-bold mb-2">{ticket.name}</h3>
+                <p className="text-white/50 text-sm mb-4">{ticket.phase}</p>
+                <div className="text-4xl font-bold gradient-text mb-6">
+                  {ticket.priceDisplay} <span className="text-lg">EGLD</span>
+                </div>
+                <ul className="text-left space-y-3 mb-8">
+                  <li className="flex items-center gap-2 text-white/70">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-400" />
+                    Festival Entry
+                  </li>
+                  <li className="flex items-center gap-2 text-white/70">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-400" />
+                    NFT Collectible
+                  </li>
+                  {i >= 1 && (
+                    <li className="flex items-center gap-2 text-white/70">
+                      <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-400" />
+                      Priority Entry
+                    </li>
+                  )}
+                  {i === 2 && (
+                    <li className="flex items-center gap-2 text-white/70">
+                      <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-400" />
+                      Backstage Access
+                    </li>
+                  )}
+                </ul>
+                <Link 
+                  to={isLoggedIn ? RouteNamesEnum.tickets : RouteNamesEnum.unlock}
+                  className={i === 1 ? "btn-primary w-full" : "btn-secondary w-full"}
+                >
+                  {isLoggedIn ? 'Buy Now' : 'Connect to Buy'}
+                </Link>
+              </div>
+            )) : (
+              // Default ticket types while loading
+              ['General Admission', 'VIP', 'Backstage'].map((name, i) => (
+                <div 
+                  key={i}
+                  className={`glass-card-hover p-8 text-center relative overflow-hidden ${i === 1 ? 'ring-2 ring-purple-500' : ''}`}
+                >
+                  {i === 1 && (
+                    <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-4 py-1 rounded-bl-lg">
+                      POPULAR
+                    </div>
+                  )}
+                  <h3 className="text-2xl font-bold mb-2">{name}</h3>
+                  <p className="text-white/50 text-sm mb-4">Early Bird</p>
+                  <div className="text-4xl font-bold gradient-text mb-6">
+                    {[0.05, 0.1, 0.25][i]} <span className="text-lg">EGLD</span>
+                  </div>
+                  <Link 
+                    to={isLoggedIn ? RouteNamesEnum.tickets : RouteNamesEnum.unlock}
+                    className={i === 1 ? "btn-primary w-full" : "btn-secondary w-full"}
+                  >
+                    {isLoggedIn ? 'Buy Now' : 'Connect to Buy'}
+                  </Link>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -120,19 +249,19 @@ export const Home = () => {
               },
               {
                 icon: faQrcode,
-                title: 'Easy Validation',
+                title: 'Easy Check-In',
                 description: 'Instant ticket verification through QR codes linked to blockchain',
                 color: 'from-pink-500 to-rose-500'
               },
               {
                 icon: faGlobe,
-                title: 'Transparent',
-                description: 'All transactions are public and verifiable on the blockchain',
+                title: 'Resale Market',
+                description: 'Safely resell your tickets with built-in commission for organizers',
                 color: 'from-cyan-500 to-blue-500'
               },
               {
                 icon: faLock,
-                title: 'Secure Ownership',
+                title: 'Your Wallet',
                 description: 'Your tickets are stored in your wallet, fully under your control',
                 color: 'from-emerald-500 to-teal-500'
               }
@@ -153,92 +282,14 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Featured Events */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
-            <div>
-              <h2 className="text-4xl md:text-5xl font-bold mb-4">
-                Featured <span className="gradient-text">Events</span>
-              </h2>
-              <p className="text-white/60">Don't miss out on the hottest upcoming events</p>
-            </div>
-            <Link 
-              to={RouteNamesEnum.tickets} 
-              className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              View All Events
-              <FontAwesomeIcon icon={faArrowRight} />
-            </Link>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredEvents.map((event, i) => (
-              <Link 
-                key={event.id}
-                to={`${RouteNamesEnum.tickets}?event=${event.id}`}
-                className="glass-card-hover overflow-hidden group"
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
-                {/* Image */}
-                <div className="relative h-48 overflow-hidden">
-                  <img 
-                    src={event.imageUrl} 
-                    alt={event.name}
-                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-transparent to-transparent" />
-                  <div className="absolute top-4 left-4">
-                    <span className="badge-primary">
-                      {getCategoryIcon(event.category)} {event.category}
-                    </span>
-                  </div>
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-xl font-bold text-white line-clamp-1">{event.name}</h3>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-white/60 text-sm mb-3">
-                    <span>📍 {event.venue}, {event.city}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-white/60 text-sm mb-4">
-                    <span>📅 {new Date(event.date).toLocaleDateString('en-US', { 
-                      weekday: 'short', 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center pt-4 border-t border-white/10">
-                    <div>
-                      <span className="text-white/50 text-xs">Starting from</span>
-                      <div className="text-lg font-bold text-white">
-                        {Math.min(...event.ticketTypes.map(t => parseFloat(t.price)))} EGLD
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-purple-400 group-hover:text-purple-300 transition-colors">
-                      <span className="text-sm font-medium">Get Tickets</span>
-                      <FontAwesomeIcon icon={faArrowRight} className="transform group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* How It Works */}
-      <section className="py-24 px-6 bg-dark-900/50">
+      <section className="py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">
               How It <span className="gradient-text">Works</span>
             </h2>
-            <p className="text-white/60 text-lg">Get started in just a few simple steps</p>
+            <p className="text-white/60 text-lg">Get your ticket in just a few simple steps</p>
           </div>
 
           <div className="grid md:grid-cols-4 gap-8">
@@ -246,22 +297,22 @@ export const Home = () => {
               {
                 step: '01',
                 title: 'Connect Wallet',
-                description: 'Link your MultiversX wallet to get started'
+                description: 'Link your MultiversX wallet (xPortal, DeFi Wallet, etc.)'
               },
               {
                 step: '02',
-                title: 'Browse Events',
-                description: 'Explore concerts, sports, festivals and more'
+                title: 'Choose Ticket',
+                description: 'Select your ticket type and complete the purchase'
               },
               {
                 step: '03',
-                title: 'Buy NFT Tickets',
-                description: 'Purchase tickets securely on the blockchain'
+                title: 'Receive NFT',
+                description: 'Your ticket NFT appears in your wallet instantly'
               },
               {
                 step: '04',
-                title: 'Attend & Enjoy',
-                description: 'Show your QR code at the venue for instant entry'
+                title: 'Check-In',
+                description: 'Generate QR code at the venue for instant entry'
               }
             ].map((item, i) => (
               <div key={i} className="relative text-center">
@@ -298,23 +349,24 @@ export const Home = () => {
 
             <div className="relative">
               <h2 className="text-4xl md:text-5xl font-bold mb-4">
-                Ready to Experience the Future?
+                Don't Miss Out!
               </h2>
               <p className="text-white/60 text-lg mb-8 max-w-xl mx-auto">
-                Join thousands of users already enjoying secure, transparent, 
-                and fraud-proof event ticketing.
+                {festivalData 
+                  ? `Only ${festivalData.maxTickets - festivalData.soldTickets} tickets remaining. Secure yours before they're gone!`
+                  : 'Limited tickets available. Secure yours before they sell out!'}
               </p>
               
               {isLoggedIn ? (
                 <Link to={RouteNamesEnum.tickets} className="btn-accent inline-flex items-center gap-2">
                   <FontAwesomeIcon icon={faTicket} />
-                  Browse Events Now
+                  Get Your Tickets Now
                   <FontAwesomeIcon icon={faArrowRight} />
                 </Link>
               ) : (
                 <Link to={RouteNamesEnum.unlock} className="btn-accent inline-flex items-center gap-2">
                   <FontAwesomeIcon icon={faWallet} />
-                  Connect Your Wallet
+                  Connect Wallet to Buy
                   <FontAwesomeIcon icon={faArrowRight} />
                 </Link>
               )}

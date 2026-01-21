@@ -8,49 +8,35 @@ import {
   faTimesCircle,
   faTicket,
   faUser,
-  faCalendar,
-  faMapMarkerAlt,
   faShieldHalved,
   faCamera,
   faKeyboard,
   faHistory,
   faSpinner
 } from '@fortawesome/free-solid-svg-icons';
-import { mockOwnedTickets } from 'data/mockEvents';
-import { OwnedTicket, TicketValidation } from 'types/ticket.types';
+import { API_URL, contractAddress } from 'config';
+
+interface ValidationResult {
+  ticketId: string;
+  isValid: boolean;
+  ownerAddress?: string;
+  nonce?: number;
+  collection?: string;
+  validationTime: string;
+  errorMessage?: string;
+}
 
 const formatAddress = (address: string) => {
   if (!address) return '';
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
 };
 
-// Simulated validation history
-const validationHistory: TicketValidation[] = [
-  {
-    ticketId: 'TICKET-a1b2c3-01',
-    isValid: true,
-    eventName: 'Electric Dreams Festival 2026',
-    ticketType: 'VIP Experience',
-    ownerAddress: 'erd1qqqqqqqqqqqqqpgq...',
-    validationTime: '2026-01-19T14:30:00'
-  },
-  {
-    ticketId: 'TICKET-invalid-99',
-    isValid: false,
-    eventName: 'Unknown Event',
-    ticketType: 'Unknown',
-    ownerAddress: '',
-    validationTime: '2026-01-19T14:25:00',
-    errorMessage: 'Ticket not found on blockchain'
-  }
-];
-
 export const Validate = () => {
   const [inputMode, setInputMode] = useState<'manual' | 'scan'>('manual');
   const [ticketId, setTicketId] = useState('');
   const [isValidating, setIsValidating] = useState(false);
-  const [validationResult, setValidationResult] = useState<TicketValidation | null>(null);
-  const [history, setHistory] = useState<TicketValidation[]>(validationHistory);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [history, setHistory] = useState<ValidationResult[]>([]);
 
   const handleValidate = async () => {
     if (!ticketId.trim()) return;
@@ -58,49 +44,57 @@ export const Validate = () => {
     setIsValidating(true);
     setValidationResult(null);
     
-    // Simulate blockchain validation delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Check if ticket exists in mock data
-    const foundTicket = mockOwnedTickets.find(t => 
-      t.tokenId.toLowerCase() === ticketId.toLowerCase() || 
-      t.id === ticketId
-    );
-    
-    const result: TicketValidation = foundTicket 
-      ? {
-          ticketId: foundTicket.tokenId,
-          isValid: !foundTicket.isUsed,
-          eventName: foundTicket.eventName,
-          ticketType: foundTicket.ticketType,
-          ownerAddress: 'erd1qqqqqqqqqqqqqpgq8tq5rulzxzje29v8kzmcxx9pgx6kmevmep6qckwthl',
+    try {
+      // Try to fetch NFT info from the API
+      // Format: COLLECTION-NONCE or just the identifier
+      const response = await fetch(`${API_URL}/nfts/${ticketId}`);
+      
+      if (response.ok) {
+        const nftData = await response.json();
+        
+        const result: ValidationResult = {
+          ticketId: nftData.identifier || ticketId,
+          isValid: true,
+          ownerAddress: nftData.owner,
+          nonce: nftData.nonce,
+          collection: nftData.collection,
           validationTime: new Date().toISOString(),
-          errorMessage: foundTicket.isUsed ? 'Ticket has already been used' : undefined
-        }
-      : {
+        };
+        
+        setValidationResult(result);
+        setHistory([result, ...history]);
+      } else {
+        // NFT not found
+        const result: ValidationResult = {
           ticketId: ticketId,
           isValid: false,
-          eventName: 'Unknown',
-          ticketType: 'Unknown',
-          ownerAddress: '',
           validationTime: new Date().toISOString(),
           errorMessage: 'Ticket not found on blockchain'
         };
-    
-    setValidationResult(result);
-    setHistory([result, ...history]);
-    setIsValidating(false);
+        
+        setValidationResult(result);
+        setHistory([result, ...history]);
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
+      const result: ValidationResult = {
+        ticketId: ticketId,
+        isValid: false,
+        validationTime: new Date().toISOString(),
+        errorMessage: 'Failed to validate ticket. Please try again.'
+      };
+      
+      setValidationResult(result);
+      setHistory([result, ...history]);
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleMarkAsUsed = () => {
     if (validationResult && validationResult.isValid) {
-      // In production, this would call the smart contract
-      alert('Ticket marked as used on the blockchain!');
-      setValidationResult({
-        ...validationResult,
-        isValid: false,
-        errorMessage: 'Ticket has been marked as used'
-      });
+      // In production, this would call the smart contract checkIn function
+      alert('In production, this would mark the ticket as used via the smart contract checkIn function');
     }
   };
 
@@ -118,7 +112,7 @@ export const Validate = () => {
             </h1>
             <p className="text-white/60 text-lg max-w-xl mx-auto">
               Verify NFT tickets on the blockchain instantly. 
-              Scan QR codes or enter ticket IDs manually.
+              Enter the NFT identifier to validate.
             </p>
           </div>
 
@@ -155,7 +149,7 @@ export const Validate = () => {
             {inputMode === 'manual' ? (
               <div>
                 <label className="block text-white/70 text-sm mb-2">
-                  Enter Ticket ID or Token ID
+                  Enter NFT Identifier (e.g., FEST-abc123-01)
                 </label>
                 <div className="flex gap-4">
                   <div className="flex-1 relative">
@@ -165,7 +159,7 @@ export const Validate = () => {
                     />
                     <input
                       type="text"
-                      placeholder="TICKET-a1b2c3-01"
+                      placeholder="COLLECTION-NONCE"
                       value={ticketId}
                       onChange={(e) => setTicketId(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
@@ -186,17 +180,7 @@ export const Validate = () => {
                   </button>
                 </div>
                 <p className="text-white/40 text-sm mt-2">
-                  Try: <button 
-                    onClick={() => setTicketId('TICKET-a1b2c3-01')} 
-                    className="text-purple-400 hover:underline"
-                  >
-                    TICKET-a1b2c3-01
-                  </button> (valid) or <button 
-                    onClick={() => setTicketId('TICKET-g7h8i9-03')} 
-                    className="text-purple-400 hover:underline"
-                  >
-                    TICKET-g7h8i9-03
-                  </button> (used)
+                  Enter the full NFT identifier from the blockchain
                 </p>
               </div>
             ) : (
@@ -207,7 +191,7 @@ export const Validate = () => {
                   <p className="text-white/30 text-sm mt-2">Point camera at QR code</p>
                 </div>
                 <p className="text-white/40 text-sm mt-4">
-                  Camera-based QR scanning would be implemented in production using a library like react-qr-reader
+                  QR scanning would be implemented using a library like react-qr-reader
                 </p>
               </div>
             )}
@@ -240,7 +224,7 @@ export const Validate = () => {
                   <h3 className={`text-2xl font-bold mb-2 ${
                     validationResult.isValid ? 'text-emerald-400' : 'text-red-400'
                   }`}>
-                    {validationResult.isValid ? 'Valid Ticket' : 'Invalid Ticket'}
+                    {validationResult.isValid ? 'Valid Ticket ✓' : 'Invalid Ticket'}
                   </h3>
                   
                   {validationResult.errorMessage && (
@@ -251,10 +235,9 @@ export const Validate = () => {
                     <div className="p-3 rounded-xl bg-white/5">
                       <div className="text-white/50 text-xs mb-1 flex items-center gap-2">
                         <FontAwesomeIcon icon={faTicket} />
-                        Event
+                        Token ID
                       </div>
-                      <div className="font-medium">{validationResult.eventName}</div>
-                      <div className="text-white/50 text-sm">{validationResult.ticketType}</div>
+                      <div className="font-mono text-sm break-all">{validationResult.ticketId}</div>
                     </div>
 
                     {validationResult.ownerAddress && (
@@ -270,10 +253,12 @@ export const Validate = () => {
                     )}
                   </div>
 
-                  <div className="p-3 rounded-xl bg-white/5 mb-4">
-                    <div className="text-white/50 text-xs mb-1">Token ID</div>
-                    <div className="font-mono text-sm">{validationResult.ticketId}</div>
-                  </div>
+                  {validationResult.collection && (
+                    <div className="p-3 rounded-xl bg-white/5 mb-4">
+                      <div className="text-white/50 text-xs mb-1">Collection</div>
+                      <div className="font-mono text-sm">{validationResult.collection}</div>
+                    </div>
+                  )}
 
                   {validationResult.isValid && (
                     <button
@@ -281,7 +266,7 @@ export const Validate = () => {
                       className="btn-success flex items-center gap-2"
                     >
                       <FontAwesomeIcon icon={faCheckCircle} />
-                      Mark as Used (Allow Entry)
+                      Allow Entry (Check-In)
                     </button>
                   )}
                 </div>
@@ -311,16 +296,18 @@ export const Validate = () => {
                         className={item.isValid ? 'text-emerald-400' : 'text-red-400'}
                       />
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{item.eventName}</div>
-                      <div className="text-white/50 text-sm font-mono">{item.ticketId}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{item.ticketId}</div>
+                      {item.ownerAddress && (
+                        <div className="text-white/50 text-sm font-mono">{formatAddress(item.ownerAddress)}</div>
+                      )}
                     </div>
                     <div className="text-right text-sm">
                       <div className={item.isValid ? 'text-emerald-400' : 'text-red-400'}>
                         {item.isValid ? 'Valid' : 'Invalid'}
                       </div>
                       <div className="text-white/40 text-xs">
-                        {item.validationTime && new Date(item.validationTime).toLocaleTimeString()}
+                        {new Date(item.validationTime).toLocaleTimeString()}
                       </div>
                     </div>
                   </div>
@@ -328,7 +315,7 @@ export const Validate = () => {
               </div>
             ) : (
               <div className="text-center py-8 text-white/50">
-                No validation history yet
+                No validation history yet. Enter a ticket ID above to validate.
               </div>
             )}
           </div>
@@ -339,4 +326,3 @@ export const Validate = () => {
 };
 
 export default Validate;
-

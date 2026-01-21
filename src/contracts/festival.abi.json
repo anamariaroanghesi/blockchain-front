@@ -1,0 +1,196 @@
+{
+  "buildInfo": {
+    "rustc": {
+      "version": "1.77.0"
+    },
+    "contractCrate": {
+      "name": "festival-smart-contract",
+      "version": "0.0.0"
+    },
+    "framework": {
+      "name": "multiversx-sc",
+      "version": "0.50.0"
+    }
+  },
+  "name": "FestivalSmartContract",
+  "constructor": {
+    "inputs": [],
+    "outputs": []
+  },
+  "endpoints": [
+    {
+      "name": "addFestival",
+      "onlyOwner": true,
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "name", "type": "bytes" },
+        { "name": "start_time", "type": "u64" },
+        { "name": "end_time", "type": "u64" },
+        { "name": "max_tickets", "type": "u64" },
+        { "name": "tax_normal", "type": "u8" },
+        { "name": "tax_sold_out", "type": "u8" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "addEvent",
+      "onlyOwner": true,
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" },
+        { "name": "name", "type": "bytes" },
+        { "name": "location", "type": "bytes" },
+        { "name": "start_time", "type": "u64" },
+        { "name": "end_time", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "addTicketPrice",
+      "onlyOwner": true,
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" },
+        { "name": "name", "type": "bytes" },
+        { "name": "phase", "type": "bytes" },
+        { "name": "price", "type": "BigUint" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "addFlashEvent",
+      "onlyOwner": true,
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" },
+        { "name": "name", "type": "bytes" },
+        { "name": "start_time", "type": "u64" },
+        { "name": "end_time", "type": "u64" },
+        { "name": "bonus_points", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "setTicketTokenIdentifier",
+      "onlyOwner": true,
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "token_identifier", "type": "TokenIdentifier" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "buyTicket",
+      "mutability": "mutable",
+      "payableInTokens": ["EGLD"],
+      "inputs": [
+        { "name": "festival_id", "type": "u64" },
+        { "name": "ticket_price_name", "type": "bytes" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "createParticipant",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "username", "type": "bytes" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "checkIn",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "checkOut",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "claimFlashEventPoints",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" },
+        { "name": "flash_event_index", "type": "u32" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "putTicketForSale",
+      "mutability": "mutable",
+      "payableInTokens": ["*"],
+      "inputs": [
+        { "name": "festival_id", "type": "u64" },
+        { "name": "price", "type": "BigUint" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "buyResaleTicket",
+      "mutability": "mutable",
+      "payableInTokens": ["EGLD"],
+      "inputs": [
+        { "name": "ticket_nonce", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "getFestivalData",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "tuple<bytes,u64,u64,u64,u64,u64>" }
+      ]
+    },
+    {
+      "name": "getTicketPrices",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "variadic<tuple<bytes,bytes,BigUint>>", "multi_result": true }
+      ]
+    },
+    {
+      "name": "getEvents",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "variadic<tuple<bytes,bytes,u64,u64>>", "multi_result": true }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "identifier": "ticketBought",
+      "inputs": [
+        { "name": "buyer", "type": "Address", "indexed": true },
+        { "name": "festival_id", "type": "u64", "indexed": true },
+        { "name": "ticket_nonce", "type": "u64", "indexed": true }
+      ]
+    },
+    {
+      "identifier": "participantCreated",
+      "inputs": [
+        { "name": "address", "type": "Address", "indexed": true },
+        { "name": "username", "type": "bytes", "indexed": true }
+      ]
+    }
+  ],
+  "esdtAttributes": [],
+  "hasCallback": false,
+  "types": {}
+}
+

@@ -1,41 +1,19 @@
-import {
-  type ExtensionLoginButtonPropsType,
-  type WebWalletLoginButtonPropsType,
-  type LedgerLoginButtonPropsType,
-  type WalletConnectLoginButtonPropsType
-} from '@multiversx/sdk-dapp/UI';
-import {
-  ExtensionLoginButton,
-  LedgerLoginButton,
-  WalletConnectLoginButton,
-  CrossWindowLoginButton
-} from 'components/sdkDappComponents';
+import { CrossWindowLoginButton } from 'components/sdkDappComponents';
 import { nativeAuth } from 'config';
 import { RouteNamesEnum } from 'localConstants';
-import { useNavigate } from 'react-router-dom';
 import { AuthRedirectWrapper } from 'wrappers';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faWallet, 
   faShieldHalved, 
-  faArrowRight
+  faArrowRight,
+  faGlobe
 } from '@fortawesome/free-solid-svg-icons';
 
-type CommonPropsType =
-  | ExtensionLoginButtonPropsType
-  | WebWalletLoginButtonPropsType
-  | LedgerLoginButtonPropsType
-  | WalletConnectLoginButtonPropsType;
-
 export const Unlock = () => {
-  const navigate = useNavigate();
-
-  const commonProps: CommonPropsType = {
+  const commonProps = {
     callbackRoute: RouteNamesEnum.dashboard,
-    nativeAuth,
-    onLoginRedirect: () => {
-      navigate(RouteNamesEnum.dashboard);
-    }
+    nativeAuth
   };
 
   return (
@@ -49,52 +27,29 @@ export const Unlock = () => {
             </div>
             <h1 className='text-3xl font-bold mb-2'>Connect Wallet</h1>
             <p className='text-white/60'>
-              Choose a wallet to connect to NFT Ticket Master
+              Connect to NFT Ticket Master using MultiversX Web Wallet
             </p>
           </div>
 
-          {/* Login Options */}
+          {/* Login Option */}
           <div 
-            className='glass-card p-6'
+            className='glass-card p-8'
             data-testid='unlockPage'
           >
-            {/* Recommended - xPortal */}
-            <div className='mb-4'>
-              <div className='text-xs text-purple-400 font-semibold uppercase tracking-wider mb-2'>
-                📱 Recommended
+            <div className='text-center mb-6'>
+              <div className='w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mx-auto mb-4'>
+                <FontAwesomeIcon icon={faGlobe} className='text-2xl text-white' />
               </div>
-              <WalletConnectLoginButton
-                loginButtonText='xPortal App'
-                {...commonProps}
-              />
-              <p className='text-xs text-white/40 mt-1 ml-1'>
-                Scan QR code with xPortal mobile app
+              <h2 className='text-xl font-semibold mb-2'>MultiversX Web Wallet</h2>
+              <p className='text-white/50 text-sm'>
+                Securely connect using the official MultiversX web wallet
               </p>
             </div>
-
-            <div className='border-t border-white/10 my-4' />
-
-            {/* Other Options */}
-            <div className='text-xs text-white/50 font-semibold uppercase tracking-wider mb-3'>
-              Other Options
-            </div>
             
-            <div className='space-y-2'>
-              <ExtensionLoginButton
-                loginButtonText='🧩 DeFi Wallet Extension'
-                {...commonProps}
-              />
-              
-              <CrossWindowLoginButton
-                loginButtonText='🌐 MultiversX Web Wallet'
-                {...commonProps}
-              />
-              
-              <LedgerLoginButton
-                loginButtonText='🔐 Ledger Hardware Wallet'
-                {...commonProps}
-              />
-            </div>
+            <CrossWindowLoginButton
+              loginButtonText='Connect with Web Wallet'
+              {...commonProps}
+            />
           </div>
 
           {/* Security notice */}
@@ -113,17 +68,17 @@ export const Unlock = () => {
             <p className='text-white/40 text-sm'>
               Don't have a wallet?{' '}
               <a 
-                href='https://xportal.com' 
+                href='https://wallet.multiversx.com' 
                 target='_blank' 
                 rel='noopener noreferrer'
                 className='text-purple-400 hover:text-purple-300 transition-colors'
               >
-                Download xPortal
+                Create one here
                 <FontAwesomeIcon icon={faArrowRight} className='ml-1 text-xs' />
               </a>
             </p>
             <p className='text-white/30 text-xs mt-2'>
-              This app uses <span className='text-purple-400'>MultiversX Testnet</span>
+              This app uses <span className='text-purple-400'>MultiversX Devnet</span>
             </p>
           </div>
         </div>
