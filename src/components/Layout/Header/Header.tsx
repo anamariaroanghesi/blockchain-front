@@ -48,8 +48,7 @@ export const Header = () => {
 
   const navItems = [
     { path: RouteNamesEnum.home, label: 'Home', icon: faHome },
-    { path: RouteNamesEnum.festival, label: 'Festival', icon: faMusic },
-    { path: RouteNamesEnum.tickets, label: 'Buy Tickets', icon: faTicket },
+    { path: RouteNamesEnum.festivals, label: 'Festivals', icon: faMusic },
     { path: RouteNamesEnum.resale, label: 'Resale', icon: faExchangeAlt },
     ...(isLoggedIn ? [
       { path: RouteNamesEnum.dashboard, label: 'My Tickets', icon: faWallet },

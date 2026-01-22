@@ -162,13 +162,31 @@
       ]
     },
     {
-      "name": "getEvents",
+      "name": "getEventsForFestival",
       "mutability": "readonly",
       "inputs": [
         { "name": "festival_id", "type": "u64" }
       ],
       "outputs": [
         { "type": "variadic<tuple<bytes,bytes,u64,u64>>", "multi_result": true }
+      ]
+    },
+    {
+      "name": "getProducts",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "festival_id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "variadic<tuple<u64,bytes,BigUint,bytes,bytes>>", "multi_result": true }
+      ]
+    },
+    {
+      "name": "getAllFestivals",
+      "mutability": "readonly",
+      "inputs": [],
+      "outputs": [
+        { "type": "variadic<tuple<u64,bytes,u64,u64,u64,u64,u64>>", "multi_result": true }
       ]
     }
   ],

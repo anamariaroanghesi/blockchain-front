@@ -1,0 +1,2 @@
+export { FestivalsList } from './FestivalsList';
+

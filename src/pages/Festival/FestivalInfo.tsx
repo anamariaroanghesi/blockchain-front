@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useGetIsLoggedIn } from 'hooks';
 import { 
   useFestivalData, 
   useTicketPrices, 
-  useFestivalEvents 
+  useFestivalEvents,
+  useFestivalProducts
 } from 'hooks/festival';
 import { RouteNamesEnum } from 'localConstants';
 import { 
@@ -28,24 +29,74 @@ import {
   faExchangeAlt,
   faWallet,
   faSpinner,
-  faBolt
+  faBolt,
+  faShoppingCart
 } from '@fortawesome/free-solid-svg-icons';
 import { FESTIVAL_ID } from 'config';
 
 export const FestivalInfo = () => {
+  const { id } = useParams<{ id: string }>();
+  const festivalId = id ? parseInt(id, 10) : FESTIVAL_ID;
+  
   const isLoggedIn = useGetIsLoggedIn();
-  const { festivalData, isLoading: loadingFestival } = useFestivalData(FESTIVAL_ID);
-  const { ticketPrices, isLoading: loadingPrices } = useTicketPrices(FESTIVAL_ID);
-  const { events, isLoading: loadingEvents } = useFestivalEvents(FESTIVAL_ID);
+  const { festivalData, isLoading: loadingFestival, error: festivalError } = useFestivalData(festivalId);
+  const { ticketPrices, isLoading: loadingPrices, error: pricesError } = useTicketPrices(festivalId);
+  const { events, isLoading: loadingEvents } = useFestivalEvents(festivalId);
+  const { products, isLoading: loadingProducts } = useFestivalProducts(festivalId);
 
-  const isLoading = loadingFestival || loadingPrices || loadingEvents;
+  const isLoading = loadingFestival || loadingPrices || loadingEvents || loadingProducts;
 
-  if (isLoading || !festivalData) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <FontAwesomeIcon icon={faSpinner} className="text-4xl text-purple-400 animate-spin mb-4" />
           <div className="text-white/50">Loading festival info from blockchain...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show setup instructions if contract is not initialized
+  if (!festivalData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="max-w-2xl w-full glass-card p-8 border-l-4 border-yellow-500">
+          <div className="flex items-start gap-4">
+            <FontAwesomeIcon icon={faInfoCircle} className="text-yellow-400 text-3xl mt-1" />
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Smart Contract Not Configured</h2>
+              <p className="text-white/70 mb-4">
+                The festival smart contract needs to be initialized by the owner. Please call the following functions:
+              </p>
+              <ul className="space-y-3 text-white/60 mb-6">
+                <li className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-yellow-400 rounded-full mt-2 flex-shrink-0"></span>
+                  <code className="bg-white/10 px-2 py-1 rounded text-sm break-all">
+                    addFestival(name, start_time, end_time, max_tickets, tax_normal, tax_sold_out)
+                  </code>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-yellow-400 rounded-full mt-2 flex-shrink-0"></span>
+                  <code className="bg-white/10 px-2 py-1 rounded text-sm break-all">
+                    addTicketPrice(festival_id, name, phase, price_in_wei)
+                  </code>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-yellow-400 rounded-full mt-2 flex-shrink-0"></span>
+                  <code className="bg-white/10 px-2 py-1 rounded text-sm break-all">
+                    setTicketTokenIdentifier(token_identifier)
+                  </code>
+                </li>
+              </ul>
+              <p className="text-white/50 text-sm">
+                Use the MultiversX Explorer to call these functions as the contract owner.
+              </p>
+              {festivalError && (
+                <p className="mt-4 text-red-400 text-sm">Error: {festivalError}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -115,7 +166,7 @@ export const FestivalInfo = () => {
             <div className="flex flex-wrap gap-4 pt-4">
               {!isSoldOut && (
                 <Link 
-                  to={RouteNamesEnum.tickets}
+                  to={`/tickets/${festivalId}`}
                   className="btn-primary flex items-center gap-2"
                 >
                   <FontAwesomeIcon icon={faTicket} />
@@ -162,11 +213,6 @@ export const FestivalInfo = () => {
               <FontAwesomeIcon icon={faTicket} className="text-amber-400 text-xl mb-2" />
               <div className="text-2xl font-bold">{festivalData.soldTickets.toLocaleString()}</div>
               <div className="text-white/50 text-sm">Tickets Sold</div>
-            </div>
-            <div className="glass-card p-4 text-center">
-              <FontAwesomeIcon icon={faUsers} className="text-emerald-400 text-xl mb-2" />
-              <div className="text-2xl font-bold">{festivalData.insideCount.toLocaleString()}</div>
-              <div className="text-white/50 text-sm">Currently Inside</div>
             </div>
             <div className="glass-card p-4 text-center">
               <FontAwesomeIcon icon={faWallet} className="text-blue-400 text-xl mb-2" />
@@ -244,8 +290,11 @@ export const FestivalInfo = () => {
                 </div>
                 <div>
                   <div className="font-semibold">Location</div>
-                  <div className="text-white/60">Main Arena</div>
-                  <div className="text-white/60">MultiversX City, Blockchain District</div>
+                  {events.length > 0 ? (
+                    <div className="text-white/60">{events[0].location}</div>
+                  ) : (
+                    <div className="text-white/60">Venue TBA</div>
+                  )}
                 </div>
               </div>
               
@@ -276,6 +325,18 @@ export const FestivalInfo = () => {
             Prices fetched live from the smart contract
           </p>
           
+          {ticketPrices.length === 0 ? (
+            <div className="glass-card p-8 text-center border-l-4 border-yellow-500">
+              <FontAwesomeIcon icon={faInfoCircle} className="text-yellow-400 text-3xl mb-4" />
+              <h3 className="text-xl font-bold mb-2">No Ticket Prices Set</h3>
+              <p className="text-white/60 mb-4">
+                The contract owner needs to add ticket prices using:
+              </p>
+              <code className="bg-white/10 px-3 py-2 rounded text-sm text-white/70">
+                addTicketPrice(festival_id, name, phase, price_in_wei)
+              </code>
+            </div>
+          ) : (
           <div className="grid md:grid-cols-3 gap-6">
             {ticketPrices.map((ticket, i) => (
               <div 
@@ -325,7 +386,7 @@ export const FestivalInfo = () => {
                 </ul>
                 
                 <Link 
-                  to={`${RouteNamesEnum.tickets}?type=${encodeURIComponent(ticket.name)}`}
+                  to={`/tickets/${festivalId}?type=${encodeURIComponent(ticket.name)}`}
                   className={`w-full py-3 rounded-xl font-semibold text-center block ${
                     i === 1 ? 'btn-primary' : 'btn-secondary'
                   }`}
@@ -335,6 +396,7 @@ export const FestivalInfo = () => {
               </div>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -371,6 +433,55 @@ export const FestivalInfo = () => {
         </section>
       )}
 
+      {/* Products from Smart Contract */}
+      {products.length > 0 && (
+        <section className="py-16 px-6 bg-dark-900/50">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold mb-2 text-center">
+              Festival <span className="gradient-text">Products</span>
+            </h2>
+            <p className="text-white/50 text-center mb-8">
+              Available for purchase at the festival
+            </p>
+            
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product) => (
+                <div key={product.productId} className="glass-card p-6 flex flex-col">
+                  {product.imageUrl && (
+                    <div className="w-full h-40 rounded-xl mb-4 overflow-hidden bg-white/5">
+                      <img 
+                        src={product.imageUrl} 
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                      <FontAwesomeIcon icon={faShoppingCart} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold">{product.name}</h3>
+                      <p className="text-emerald-400 font-semibold">
+                        ${product.priceDisplay}
+                      </p>
+                    </div>
+                  </div>
+                  {product.description && (
+                    <p className="text-white/60 text-sm flex-1">
+                      {product.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* CTA Section */}
       <section className="py-16 px-6 bg-dark-900/50">
         <div className="max-w-4xl mx-auto text-center">
@@ -384,7 +495,7 @@ export const FestivalInfo = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {!isSoldOut && (
               <Link 
-                to={RouteNamesEnum.tickets}
+                to={`/tickets/${festivalId}`}
                 className="btn-accent flex items-center gap-2 justify-center"
               >
                 <FontAwesomeIcon icon={faTicket} />

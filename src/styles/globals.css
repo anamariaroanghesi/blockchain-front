@@ -407,3 +407,41 @@
 .dapp-core-component-toast {
   @apply bg-dark-800 border border-white/10 rounded-xl text-white shadow-lg;
 }
+
+/* SDK Transaction Tracker Modal - force dark text on light background */
+[class*="TransactionToast"],
+[class*="transaction-toast"],
+[class*="SignTransactionsModal"],
+.dapp-core-component__main,
+.card.dapp-core-component,
+.dapp-core-component-transactionsToastList-transactionsToastListWrapper,
+[class*="toast"] {
+  color: #1a1a2e !important;
+}
+
+[class*="TransactionToast"] *,
+[class*="transaction-toast"] *,
+[class*="SignTransactionsModal"] *,
+.dapp-core-component__main *,
+.card.dapp-core-component * {
+  color: inherit;
+}
+
+/* Transaction status text */
+[class*="TransactionToast"] h5,
+[class*="TransactionToast"] p,
+[class*="TransactionToast"] span,
+[class*="transaction-toast"] h5,
+[class*="transaction-toast"] p,
+[class*="transaction-toast"] span {
+  color: #1a1a2e !important;
+}
+
+/* Ensure the transaction tracker card uses proper styling */
+.card {
+  color: #1a1a2e;
+}
+
+.card h5, .card p, .card span, .card div {
+  color: inherit;
+}

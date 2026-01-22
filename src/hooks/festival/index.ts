@@ -1,7 +1,9 @@
 export { 
   useFestivalData, 
   useTicketPrices, 
-  useFestivalEvents 
+  useFestivalEvents,
+  useFestivalProducts,
+  useAllFestivals
 } from './useFestivalContract';
 
 export { 
@@ -10,6 +12,7 @@ export {
 
 export { 
   useUserTickets,
-  useResaleListings 
+  useResaleListings,
+  type ResaleListing
 } from './useUserTickets';
 

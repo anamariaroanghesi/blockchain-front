@@ -1,10 +1,11 @@
 export enum RouteNamesEnum {
   home = '/',
-  festival = '/festival',
+  festivals = '/festivals',
+  festival = '/festival/:id',
   dashboard = '/dashboard',
   unlock = '/unlock',
   disclaimer = '/disclaimer',
-  tickets = '/events',
+  tickets = '/tickets/:id',
   resale = '/resale',
   checkin = '/check-in',
   validate = '/validate'

@@ -13,7 +13,6 @@ import {
   faGlobe,
   faLock,
   faCalendar,
-  faMapMarkerAlt,
   faUsers,
   faClock,
   faMusic
@@ -22,16 +21,31 @@ import { formatDate, getAvailabilityPercentage } from 'types/festival.types';
 
 export const Home = () => {
   const isLoggedIn = useGetIsLoggedIn();
-  const { festivalData, isLoading } = useFestivalData();
-  const { ticketPrices } = useTicketPrices();
+  const { festivalData, isLoading, error: festivalError } = useFestivalData();
+  const { ticketPrices, error: pricesError } = useTicketPrices();
 
-  // Get the lowest ticket price for display
+  // Get the lowest ticket price for display  
   const lowestPrice = ticketPrices.length > 0 
     ? Math.min(...ticketPrices.map(t => parseFloat(t.priceDisplay)))
-    : 0.05;
+    : 0;
+  
+  const contractNotConfigured = !isLoading && (!festivalData || ticketPrices.length === 0);
 
   return (
     <div className="w-full">
+      {/* Contract Not Configured Warning */}
+      {contractNotConfigured && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/30 py-3 px-6">
+          <div className="max-w-6xl mx-auto flex items-center gap-3 text-yellow-300 text-sm">
+            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
+            <span>
+              <strong>Contract Setup Required:</strong> Festival data or ticket prices not configured. 
+              <Link to={RouteNamesEnum.tickets} className="underline ml-1 hover:text-yellow-200">View details →</Link>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section - Festival Focused */}
       <section className="hero-gradient relative overflow-hidden py-20 px-6">
         {/* Animated background elements */}
@@ -52,7 +66,7 @@ export const Home = () => {
             {/* Festival Name */}
             <h1 className="text-5xl md:text-7xl font-bold leading-tight animate-slide-up animation-delay-200">
               <span className="gradient-text">
-                {isLoading ? 'Loading...' : festivalData?.name || 'Electric Dreams Festival'}
+                {isLoading ? 'Loading...' : festivalData?.name || 'Festival'}
               </span>
             </h1>
 
@@ -62,10 +76,6 @@ export const Home = () => {
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faCalendar} className="text-purple-400" />
                   <span>{formatDate(festivalData.startTime)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-pink-400" />
-                  <span>Blockchain Arena</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faUsers} className="text-cyan-400" />
@@ -113,19 +123,19 @@ export const Home = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-12 animate-fade-in animation-delay-600">
               {[
                 { 
-                  value: festivalData ? `${festivalData.soldTickets}` : '0', 
+                  value: festivalData ? `${festivalData.soldTickets}` : '--', 
                   label: 'Tickets Sold' 
                 },
                 { 
-                  value: festivalData ? `${festivalData.maxTickets - festivalData.soldTickets}` : '10000', 
+                  value: festivalData ? `${festivalData.maxTickets - festivalData.soldTickets}` : '--', 
                   label: 'Available' 
                 },
                 { 
-                  value: `${lowestPrice} EGLD`, 
+                  value: lowestPrice > 0 ? `${lowestPrice.toFixed(4)} EGLD` : '--', 
                   label: 'Starting Price' 
                 },
                 { 
-                  value: festivalData ? `${Math.round(getAvailabilityPercentage(festivalData))}%` : '100%', 
+                  value: festivalData ? `${Math.round(getAvailabilityPercentage(festivalData))}%` : '--', 
                   label: 'Availability' 
                 }
               ].map((stat, i) => (
@@ -197,30 +207,23 @@ export const Home = () => {
                 </Link>
               </div>
             )) : (
-              // Default ticket types while loading
-              ['General Admission', 'VIP', 'Backstage'].map((name, i) => (
-                <div 
-                  key={i}
-                  className={`glass-card-hover p-8 text-center relative overflow-hidden ${i === 1 ? 'ring-2 ring-purple-500' : ''}`}
-                >
-                  {i === 1 && (
-                    <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-4 py-1 rounded-bl-lg">
-                      POPULAR
-                    </div>
-                  )}
-                  <h3 className="text-2xl font-bold mb-2">{name}</h3>
-                  <p className="text-white/50 text-sm mb-4">Early Bird</p>
-                  <div className="text-4xl font-bold gradient-text mb-6">
-                    {[0.05, 0.1, 0.25][i]} <span className="text-lg">EGLD</span>
-                  </div>
+              // No ticket prices configured
+              <div className="col-span-full">
+                <div className="glass-card p-8 text-center border border-yellow-500/30">
+                  <FontAwesomeIcon icon={faTicket} className="text-4xl text-yellow-400 mb-4" />
+                  <h3 className="text-xl font-bold mb-2">Ticket Prices Not Configured</h3>
+                  <p className="text-white/60 mb-4">
+                    The contract owner needs to add ticket prices.
+                  </p>
                   <Link 
-                    to={isLoggedIn ? RouteNamesEnum.tickets : RouteNamesEnum.unlock}
-                    className={i === 1 ? "btn-primary w-full" : "btn-secondary w-full"}
+                    to={RouteNamesEnum.tickets}
+                    className="btn-secondary inline-flex items-center gap-2"
                   >
-                    {isLoggedIn ? 'Buy Now' : 'Connect to Buy'}
+                    View Setup Instructions
+                    <FontAwesomeIcon icon={faArrowRight} />
                   </Link>
                 </div>
-              ))
+              </div>
             )}
           </div>
         </div>

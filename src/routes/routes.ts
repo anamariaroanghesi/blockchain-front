@@ -1,6 +1,7 @@
 import { RouteNamesEnum } from 'localConstants';
 import { Dashboard, Disclaimer, Home, Validate } from 'pages';
 import { FestivalInfo } from 'pages/Festival';
+import { FestivalsList } from 'pages/Festivals';
 import AvailableTicketsPage from 'pages/Tickets/AvailableTickets';
 import { ResaleMarketplace } from 'pages/Resale';
 import { CheckIn } from 'pages/CheckIn';
@@ -15,6 +16,11 @@ export const routes: RouteWithTitleType[] = [
     path: RouteNamesEnum.home,
     title: 'Home',
     component: Home
+  },
+  {
+    path: RouteNamesEnum.festivals,
+    title: 'All Festivals',
+    component: FestivalsList
   },
   {
     path: RouteNamesEnum.festival,
@@ -33,7 +39,7 @@ export const routes: RouteWithTitleType[] = [
   },
   {
     path: RouteNamesEnum.tickets,
-    title: 'Events',
+    title: 'Buy Tickets',
     component: AvailableTicketsPage
   },
   {

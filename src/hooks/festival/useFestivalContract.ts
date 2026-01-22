@@ -4,8 +4,78 @@ import {
   FestivalData, 
   TicketPrice, 
   FestivalEvent, 
+  FestivalProduct,
   weiToEgld 
 } from 'types/festival.types';
+
+// ========================================================
+// BINARY PARSER (Based on working Gemini implementation)
+// ========================================================
+const BinaryParser = {
+  // Convert Base64 to Uint8Array
+  fromBase64: (base64: string): Uint8Array => {
+    if (!base64) return new Uint8Array(0);
+    try {
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
+    } catch {
+      return new Uint8Array(0);
+    }
+  },
+
+  // Read a String (prefixed by 4-byte length)
+  readString: (buffer: Uint8Array, offset: number): { value: string; newOffset: number } => {
+    if (offset >= buffer.length) return { value: '', newOffset: offset };
+    const length = (buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3];
+    offset += 4;
+    let str = '';
+    for (let i = 0; i < length; i++) {
+      str += String.fromCharCode(buffer[offset + i]);
+    }
+    return { value: str, newOffset: offset + length };
+  },
+
+  // Read a BigUint (prefixed by 4-byte length)
+  readBigInt: (buffer: Uint8Array, offset: number): { value: bigint; newOffset: number } => {
+    if (offset >= buffer.length) return { value: BigInt(0), newOffset: offset };
+    const length = (buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3];
+    offset += 4;
+    let hex = '0x';
+    for (let i = 0; i < length; i++) {
+      let h = buffer[offset + i].toString(16);
+      if (h.length === 1) h = '0' + h;
+      hex += h;
+    }
+    return { value: hex === '0x' ? BigInt(0) : BigInt(hex), newOffset: offset + length };
+  },
+
+  // Read a 64-bit Integer (8 bytes, Big Endian)
+  readU64: (buffer: Uint8Array, offset: number): { value: number; newOffset: number } => {
+    if (offset + 8 > buffer.length) return { value: 0, newOffset: offset };
+    const view = new DataView(buffer.buffer, buffer.byteOffset + offset, 8);
+    const value = Number(view.getBigUint64(0, false)); // Big Endian
+    return { value, newOffset: offset + 8 };
+  },
+
+  // Read a single byte (u8)
+  readU8: (buffer: Uint8Array, offset: number): { value: number; newOffset: number } => {
+    if (offset >= buffer.length) return { value: 0, newOffset: offset };
+    return { value: buffer[offset], newOffset: offset + 1 };
+  }
+};
+
+/**
+ * Convert festival ID to hex string for API args
+ */
+const toHexArg = (num: number): string => {
+  let hex = num.toString(16);
+  if (hex.length % 2 !== 0) hex = '0' + hex;
+  return hex;
+};
 
 /**
  * Hook to fetch festival data from the smart contract
@@ -20,68 +90,82 @@ export const useFestivalData = (festivalId: number = FESTIVAL_ID) => {
     setError(null);
     
     try {
-      // Query contract via MultiversX API
-      const response = await fetch(
-        `${API_URL}/vm-values/query`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scAddress: contractAddress,
-            funcName: 'getFestivalData',
-            args: [festivalId.toString(16).padStart(16, '0')]
-          })
-        }
-      );
+      const response = await fetch(`${API_URL}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scAddress: contractAddress,
+          funcName: 'getFestivalData',
+          args: [toHexArg(festivalId)]
+        })
+      });
 
-      const result = await response.json();
+      const json = await response.json();
+      console.log('Festival data response:', json);
       
-      if (result.data?.data?.returnData && result.data.data.returnData.length > 0) {
-        // Decode the response - it returns a tuple
-        const returnData = result.data.data.returnData;
-        
-        // Parse the hex-encoded values
-        const name = Buffer.from(returnData[0] || '', 'base64').toString('utf8');
-        const startTime = parseInt(Buffer.from(returnData[1] || '', 'base64').toString('hex') || '0', 16);
-        const endTime = parseInt(Buffer.from(returnData[2] || '', 'base64').toString('hex') || '0', 16);
-        const maxTickets = parseInt(Buffer.from(returnData[3] || '', 'base64').toString('hex') || '0', 16);
-        const soldTickets = parseInt(Buffer.from(returnData[4] || '', 'base64').toString('hex') || '0', 16);
-        const insideCount = parseInt(Buffer.from(returnData[5] || '', 'base64').toString('hex') || '0', 16);
-
-        setFestivalData({
-          id: festivalId,
-          name: name || 'Festival',
-          startTime,
-          endTime,
-          maxTickets,
-          soldTickets,
-          insideCount
-        });
-      } else {
-        // Use default/mock data if contract returns empty
-        setFestivalData({
-          id: festivalId,
-          name: 'Electric Dreams Festival 2026',
-          startTime: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days from now
-          endTime: Math.floor(Date.now() / 1000) + 86400 * 33, // 33 days from now
-          maxTickets: 10000,
-          soldTickets: 0,
-          insideCount: 0
-        });
+      // The contract returns ONE packed buffer
+      const packedData = json.returnData ? json.returnData[0] : null;
+      if (!packedData) {
+        setFestivalData(null);
+        setError('Festival not found');
+        return;
       }
+
+      // Parse the packed binary data
+      // Contract returns: (id, name, start, end, max, sold, inside)
+      const buffer = BinaryParser.fromBase64(packedData);
+      let offset = 0;
+
+      // 1. ID (u64)
+      const idRes = BinaryParser.readU64(buffer, offset);
+      offset = idRes.newOffset;
+
+      // 2. Name (ManagedBuffer - has length prefix)
+      const nameRes = BinaryParser.readString(buffer, offset);
+      offset = nameRes.newOffset;
+
+      // 3. Start Time (u64)
+      const startRes = BinaryParser.readU64(buffer, offset);
+      offset = startRes.newOffset;
+
+      // 4. End Time (u64)
+      const endRes = BinaryParser.readU64(buffer, offset);
+      offset = endRes.newOffset;
+
+      // 5. Max Tickets (u64)
+      const maxRes = BinaryParser.readU64(buffer, offset);
+      offset = maxRes.newOffset;
+
+      // 6. Sold (u64)
+      const soldRes = BinaryParser.readU64(buffer, offset);
+      offset = soldRes.newOffset;
+
+      // 7. Inside (u64)
+      const insideRes = BinaryParser.readU64(buffer, offset);
+
+      console.log('Decoded festival:', {
+        id: idRes.value,
+        name: nameRes.value,
+        startTime: startRes.value,
+        endTime: endRes.value,
+        maxTickets: maxRes.value,
+        soldTickets: soldRes.value,
+        insideCount: insideRes.value
+      });
+
+      setFestivalData({
+        id: idRes.value || festivalId,
+        name: nameRes.value || 'Unknown Festival',
+        startTime: startRes.value,
+        endTime: endRes.value,
+        maxTickets: maxRes.value,
+        soldTickets: soldRes.value,
+        insideCount: insideRes.value
+      });
     } catch (err) {
       console.error('Error fetching festival data:', err);
       setError('Failed to fetch festival data');
-      // Set default data on error
-      setFestivalData({
-        id: festivalId,
-        name: 'Electric Dreams Festival 2026',
-        startTime: Math.floor(Date.now() / 1000) + 86400 * 30,
-        endTime: Math.floor(Date.now() / 1000) + 86400 * 33,
-        maxTickets: 10000,
-        soldTickets: 0,
-        insideCount: 0
-      });
+      setFestivalData(null);
     } finally {
       setIsLoading(false);
     }
@@ -107,84 +191,83 @@ export const useTicketPrices = (festivalId: number = FESTIVAL_ID) => {
     setError(null);
     
     try {
-      const response = await fetch(
-        `${API_URL}/vm-values/query`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scAddress: contractAddress,
-            funcName: 'getTicketPrices',
-            args: [festivalId.toString(16).padStart(16, '0')]
-          })
-        }
-      );
+      const response = await fetch(`${API_URL}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scAddress: contractAddress,
+          funcName: 'getTicketPrices',
+          args: [toHexArg(festivalId)]
+        })
+      });
 
-      const result = await response.json();
+      const json = await response.json();
+      console.log('Ticket prices response:', json);
       
-      if (result.data?.data?.returnData && result.data.data.returnData.length > 0) {
-        // Parse ticket prices from return data
-        const prices: TicketPrice[] = [];
-        const returnData = result.data.data.returnData;
-        
-        // Each ticket price is a tuple of (name, phase, price)
-        // The exact parsing depends on how the contract encodes the multi-value
-        for (let i = 0; i < returnData.length; i += 3) {
-          if (returnData[i] && returnData[i + 1] && returnData[i + 2]) {
-            const name = Buffer.from(returnData[i], 'base64').toString('utf8');
-            const phase = Buffer.from(returnData[i + 1], 'base64').toString('utf8');
-            const priceHex = Buffer.from(returnData[i + 2], 'base64').toString('hex');
-            const priceWei = BigInt('0x' + (priceHex || '0')).toString();
-            
-            prices.push({
-              name,
-              phase,
-              price: priceWei,
-              priceDisplay: weiToEgld(priceWei)
-            });
-          }
+      const rawData = json.returnData || [];
+      const prices: TicketPrice[] = [];
+
+      // Each item in rawData is a packed tuple
+      for (const item of rawData) {
+        const buffer = BinaryParser.fromBase64(item);
+        let offset = 0;
+
+        // 1. Name (ManagedBuffer)
+        const nameRes = BinaryParser.readString(buffer, offset);
+        offset = nameRes.newOffset;
+
+        // 2. Phase (ManagedBuffer)
+        const phaseRes = BinaryParser.readString(buffer, offset);
+        offset = phaseRes.newOffset;
+
+        // 3. Price (BigUint)
+        const priceRes = BinaryParser.readBigInt(buffer, offset);
+        offset = priceRes.newOffset;
+
+        // 4. Sale Start (u64)
+        const saleStartRes = BinaryParser.readU64(buffer, offset);
+        offset = saleStartRes.newOffset;
+
+        // 5. Sale End (u64)
+        const saleEndRes = BinaryParser.readU64(buffer, offset);
+        offset = saleEndRes.newOffset;
+
+        // 6. Ticket Type (u8)
+        const typeRes = BinaryParser.readU8(buffer, offset);
+
+        const priceWei = priceRes.value.toString();
+
+        console.log('Decoded ticket price:', {
+          name: nameRes.value,
+          phase: phaseRes.value,
+          priceWei,
+          saleStart: saleStartRes.value,
+          saleEnd: saleEndRes.value,
+          ticketType: typeRes.value
+        });
+
+        if (nameRes.value) {
+          prices.push({
+            name: nameRes.value,
+            phase: phaseRes.value,
+            price: priceWei,
+            priceDisplay: weiToEgld(priceWei),
+            saleStart: saleStartRes.value,
+            saleEnd: saleEndRes.value,
+            ticketType: typeRes.value
+          });
         }
-        
-        if (prices.length > 0) {
-          setTicketPrices(prices);
-        } else {
-          // Set default prices if none found
-          setDefaultPrices();
-        }
-      } else {
-        setDefaultPrices();
       }
+      
+      setTicketPrices(prices);
     } catch (err) {
       console.error('Error fetching ticket prices:', err);
       setError('Failed to fetch ticket prices');
-      setDefaultPrices();
+      setTicketPrices([]);
     } finally {
       setIsLoading(false);
     }
   }, [festivalId]);
-
-  const setDefaultPrices = () => {
-    setTicketPrices([
-      { 
-        name: 'General Admission', 
-        phase: 'Early Bird', 
-        price: '50000000000000000', // 0.05 EGLD
-        priceDisplay: '0.0500' 
-      },
-      { 
-        name: 'VIP', 
-        phase: 'Early Bird', 
-        price: '100000000000000000', // 0.1 EGLD
-        priceDisplay: '0.1000' 
-      },
-      { 
-        name: 'Backstage', 
-        phase: 'Early Bird', 
-        price: '250000000000000000', // 0.25 EGLD
-        priceDisplay: '0.2500' 
-      }
-    ]);
-  };
 
   useEffect(() => {
     fetchTicketPrices();
@@ -206,82 +289,61 @@ export const useFestivalEvents = (festivalId: number = FESTIVAL_ID) => {
     setError(null);
     
     try {
-      const response = await fetch(
-        `${API_URL}/vm-values/query`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scAddress: contractAddress,
-            funcName: 'getEvents',
-            args: [festivalId.toString(16).padStart(16, '0')]
-          })
-        }
-      );
+      const response = await fetch(`${API_URL}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scAddress: contractAddress,
+          funcName: 'getEventsForFestival',
+          args: [toHexArg(festivalId)]
+        })
+      });
 
-      const result = await response.json();
+      const json = await response.json();
+      console.log('Events response:', json);
       
-      if (result.data?.data?.returnData && result.data.data.returnData.length > 0) {
-        const fetchedEvents: FestivalEvent[] = [];
-        const returnData = result.data.data.returnData;
-        
-        // Each event is (name, location, start_time, end_time)
-        for (let i = 0; i < returnData.length; i += 4) {
-          if (returnData[i]) {
-            const name = Buffer.from(returnData[i], 'base64').toString('utf8');
-            const location = Buffer.from(returnData[i + 1] || '', 'base64').toString('utf8');
-            const startHex = Buffer.from(returnData[i + 2] || '', 'base64').toString('hex');
-            const endHex = Buffer.from(returnData[i + 3] || '', 'base64').toString('hex');
-            
-            fetchedEvents.push({
-              name,
-              location,
-              startTime: parseInt(startHex || '0', 16),
-              endTime: parseInt(endHex || '0', 16)
-            });
-          }
+      const rawData = json.returnData || [];
+      const fetchedEvents: FestivalEvent[] = [];
+
+      // Each item is a packed tuple: (name, location, start_time, end_time)
+      for (const item of rawData) {
+        const buffer = BinaryParser.fromBase64(item);
+        let offset = 0;
+
+        // 1. Name (ManagedBuffer)
+        const nameRes = BinaryParser.readString(buffer, offset);
+        offset = nameRes.newOffset;
+
+        // 2. Location (ManagedBuffer)
+        const locationRes = BinaryParser.readString(buffer, offset);
+        offset = locationRes.newOffset;
+
+        // 3. Start Time (u64)
+        const startRes = BinaryParser.readU64(buffer, offset);
+        offset = startRes.newOffset;
+
+        // 4. End Time (u64)
+        const endRes = BinaryParser.readU64(buffer, offset);
+
+        if (nameRes.value) {
+          fetchedEvents.push({
+            name: nameRes.value,
+            location: locationRes.value,
+            startTime: startRes.value,
+            endTime: endRes.value
+          });
         }
-        
-        if (fetchedEvents.length > 0) {
-          setEvents(fetchedEvents);
-        } else {
-          setDefaultEvents();
-        }
-      } else {
-        setDefaultEvents();
       }
+      
+      setEvents(fetchedEvents);
     } catch (err) {
       console.error('Error fetching events:', err);
       setError('Failed to fetch events');
-      setDefaultEvents();
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
   }, [festivalId]);
-
-  const setDefaultEvents = () => {
-    const baseTime = Math.floor(Date.now() / 1000) + 86400 * 30;
-    setEvents([
-      { 
-        name: 'Opening Ceremony', 
-        location: 'Main Stage',
-        startTime: baseTime,
-        endTime: baseTime + 3600 * 2
-      },
-      { 
-        name: 'DJ Shadow Set', 
-        location: 'Electronic Tent',
-        startTime: baseTime + 3600 * 3,
-        endTime: baseTime + 3600 * 5
-      },
-      { 
-        name: 'Headliner Performance', 
-        location: 'Main Stage',
-        startTime: baseTime + 3600 * 6,
-        endTime: baseTime + 3600 * 8
-      }
-    ]);
-  };
 
   useEffect(() => {
     fetchEvents();
@@ -290,5 +352,193 @@ export const useFestivalEvents = (festivalId: number = FESTIVAL_ID) => {
   return { events, isLoading, error, refetch: fetchEvents };
 };
 
-export default useFestivalData;
+/**
+ * Hook to fetch products within a festival
+ * Contract: getProducts returns (product_id, name, price, description, image_url)
+ */
+export const useFestivalProducts = (festivalId: number = FESTIVAL_ID) => {
+  const [products, setProducts] = useState<FestivalProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scAddress: contractAddress,
+          funcName: 'getProducts',
+          args: [toHexArg(festivalId)]
+        })
+      });
+
+      const json = await response.json();
+      console.log('Products response:', json);
+      
+      const rawData = json.returnData || [];
+      const fetchedProducts: FestivalProduct[] = [];
+
+      // Each item is a packed tuple: (product_id, name, price, description, image_url)
+      for (const item of rawData) {
+        const buffer = BinaryParser.fromBase64(item);
+        let offset = 0;
+
+        // 1. Product ID (u64)
+        const idRes = BinaryParser.readU64(buffer, offset);
+        offset = idRes.newOffset;
+
+        // 2. Name (ManagedBuffer)
+        const nameRes = BinaryParser.readString(buffer, offset);
+        offset = nameRes.newOffset;
+
+        // 3. Price (BigUint)
+        const priceRes = BinaryParser.readBigInt(buffer, offset);
+        offset = priceRes.newOffset;
+
+        // 4. Description (ManagedBuffer)
+        const descRes = BinaryParser.readString(buffer, offset);
+        offset = descRes.newOffset;
+
+        // 5. Image URL (ManagedBuffer)
+        const imageRes = BinaryParser.readString(buffer, offset);
+
+        const priceWei = priceRes.value.toString();
+
+        console.log('Decoded product:', {
+          productId: idRes.value,
+          name: nameRes.value,
+          priceWei,
+          description: descRes.value,
+          imageUrl: imageRes.value
+        });
+
+        if (nameRes.value) {
+          fetchedProducts.push({
+            productId: idRes.value,
+            name: nameRes.value,
+            price: priceWei,
+            priceDisplay: weiToEgld(priceWei),
+            description: descRes.value,
+            imageUrl: imageRes.value
+          });
+        }
+      }
+      
+      setProducts(fetchedProducts);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Failed to fetch products');
+      setProducts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [festivalId]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  return { products, isLoading, error, refetch: fetchProducts };
+};
+
+/**
+ * Hook to fetch ALL festivals from the smart contract
+ */
+export const useAllFestivals = () => {
+  const [festivals, setFestivals] = useState<FestivalData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAllFestivals = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const allFestivals: FestivalData[] = [];
+      
+      // Try fetching festivals 1-10 (adjust max if needed)
+      for (let id = 1; id <= 10; id++) {
+        try {
+          const response = await fetch(`${API_URL}/query`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scAddress: contractAddress,
+              funcName: 'getFestivalData',
+              args: [toHexArg(id)]
+            })
+          });
+
+          const json = await response.json();
+          const packedData = json.returnData ? json.returnData[0] : null;
+          
+          if (!packedData) continue; // No festival at this ID
+          
+          const buffer = BinaryParser.fromBase64(packedData);
+          if (buffer.length === 0) continue;
+          
+          // Contract returns: (id, name, start, end, max, sold, inside)
+          let offset = 0;
+          
+          // 1. ID (u64)
+          const idRes = BinaryParser.readU64(buffer, offset);
+          offset = idRes.newOffset;
+          
+          // 2. Name (ManagedBuffer)
+          const nameRes = BinaryParser.readString(buffer, offset);
+          offset = nameRes.newOffset;
+          
+          // Skip if no name (invalid festival)
+          if (!nameRes.value) continue;
+          
+          // 3-7: start, end, max, sold, inside (all u64)
+          const startRes = BinaryParser.readU64(buffer, offset);
+          offset = startRes.newOffset;
+          const endRes = BinaryParser.readU64(buffer, offset);
+          offset = endRes.newOffset;
+          const maxRes = BinaryParser.readU64(buffer, offset);
+          offset = maxRes.newOffset;
+          const soldRes = BinaryParser.readU64(buffer, offset);
+          offset = soldRes.newOffset;
+          const insideRes = BinaryParser.readU64(buffer, offset);
+
+          allFestivals.push({
+            id: idRes.value || id,
+            name: nameRes.value,
+            startTime: startRes.value,
+            endTime: endRes.value,
+            maxTickets: maxRes.value,
+            soldTickets: soldRes.value,
+            insideCount: insideRes.value
+          });
+        } catch (err) {
+          // Skip this ID if there's an error
+          continue;
+        }
+      }
+      
+      // Sort by ID in decreasing order (newest first)
+      allFestivals.sort((a, b) => b.id - a.id);
+      
+      setFestivals(allFestivals);
+    } catch (err) {
+      console.error('Error fetching all festivals:', err);
+      setError('Failed to fetch festivals');
+      setFestivals([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllFestivals();
+  }, [fetchAllFestivals]);
+
+  return { festivals, isLoading, error, refetch: fetchAllFestivals };
+};
+
+export default useFestivalData;

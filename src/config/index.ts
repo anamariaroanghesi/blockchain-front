@@ -10,4 +10,4 @@ export const sampleAuthenticatedDomains = [API_URL];
 export const environment = EnvironmentsEnum.devnet;
 
 // Festival configuration
-export const FESTIVAL_ID = 1;
+export const FESTIVAL_ID = 8;

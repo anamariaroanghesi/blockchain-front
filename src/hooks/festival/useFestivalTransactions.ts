@@ -25,6 +25,7 @@ const SESSION_KEY_CHECKOUT = 'festival_checkOut';
 const SESSION_KEY_PUT_FOR_SALE = 'festival_putForSale';
 const SESSION_KEY_BUY_RESALE = 'festival_buyResale';
 const SESSION_KEY_CLAIM_FLASH = 'festival_claimFlash';
+const SESSION_KEY_USE_TICKET = 'festival_useTicket';
 
 const BUY_TICKET_INFO = {
   processingMessage: 'Processing ticket purchase...',
@@ -66,6 +67,12 @@ const CLAIM_FLASH_INFO = {
   processingMessage: 'Claiming flash event points...',
   errorMessage: 'Failed to claim points',
   successMessage: 'Flash event points claimed! ⚡'
+};
+
+const USE_TICKET_INFO = {
+  processingMessage: 'Processing check-in... Sending ticket for verification',
+  errorMessage: 'Check-in failed',
+  successMessage: 'Check-in successful! Welcome to the festival! 🎉'
 };
 
 /**
@@ -228,14 +235,12 @@ export const useFestivalTransactions = () => {
 
   /**
    * Put a ticket up for resale
-   * @param festivalId - The festival ID
    * @param ticketNonce - The NFT nonce of the ticket
    * @param tokenIdentifier - The token identifier (e.g., "FEST-abc123")
    * @param priceEgld - The price in EGLD
    */
   const putTicketForSale = useCallback(
     async (
-      festivalId: number,
       ticketNonce: number,
       tokenIdentifier: string,
       priceEgld: string,
@@ -246,16 +251,28 @@ export const useFestivalTransactions = () => {
       // For ESDT/NFT transfer, we need to use ESDTNFTTransfer
       // Format: ESDTNFTTransfer@tokenId@nonce@amount@destAddress@funcName@args...
       const tokenIdHex = Buffer.from(tokenIdentifier).toString('hex');
-      const nonceHex = ticketNonce.toString(16).padStart(16, '0');
+      const nonceHex = ticketNonce.toString(16).padStart(2, '0'); // Just enough hex digits
       const amountHex = '01'; // 1 NFT
       const destHex = new Address(contractAddress).hex();
       const funcHex = Buffer.from('putTicketForSale').toString('hex');
-      const festivalIdHex = festivalId.toString(16).padStart(16, '0');
-      const priceHex = BigInt(egldToWei(priceEgld)).toString(16);
+      
+      // Convert EGLD price to wei (BigUint)
+      const priceWei = BigInt(egldToWei(priceEgld));
+      // Encode as hex, ensure even length
+      let priceHex = priceWei.toString(16);
+      if (priceHex.length % 2 !== 0) priceHex = '0' + priceHex;
+
+      console.log('Listing ticket for sale:', {
+        tokenIdentifier,
+        nonce: ticketNonce,
+        nonceHex,
+        priceEgld,
+        priceHex
+      });
 
       const transaction = newTransaction({
         value: '0',
-        data: `ESDTNFTTransfer@${tokenIdHex}@${nonceHex}@${amountHex}@${destHex}@${funcHex}@${festivalIdHex}@${priceHex}`,
+        data: `ESDTNFTTransfer@${tokenIdHex}@${nonceHex}@${amountHex}@${destHex}@${funcHex}@${priceHex}`,
         receiver: address, // For ESDTNFTTransfer, receiver is sender
         gasLimit: 20000000,
         gasPrice: GAS_PRICE,
@@ -346,6 +363,62 @@ export const useFestivalTransactions = () => {
     [address, account.nonce, network.chainId, clearAllTransactions]
   );
 
+  /**
+   * Use a ticket for entry (check-in) - sends ticket to contract for verification
+   * The contract marks the ticket as used and mints an "attendance badge" NFT
+   * Contract endpoint: checkIn (no arguments, ticket info is read from attributes)
+   * @param ticketNonce - The NFT nonce of the ticket
+   * @param tokenIdentifier - The token identifier (e.g., "FEST-abc123")
+   */
+  const useTicket = useCallback(
+    async (
+      ticketNonce: number,
+      tokenIdentifier: string,
+      _festivalId: number, // Not needed - contract reads from ticket attributes
+      callbackRoute: string
+    ) => {
+      clearAllTransactions();
+
+      // For ESDT/NFT transfer, we need to use ESDTNFTTransfer
+      // Format: ESDTNFTTransfer@tokenId@nonce@amount@destAddress@funcName
+      // Note: checkIn has NO arguments - it reads festival_id from ticket attributes
+      const tokenIdHex = Buffer.from(tokenIdentifier).toString('hex');
+      const nonceHex = ticketNonce.toString(16).padStart(2, '0');
+      const amountHex = '01'; // 1 NFT
+      const destHex = new Address(contractAddress).hex();
+      const funcHex = Buffer.from('checkIn').toString('hex'); // Contract endpoint is "checkIn"
+
+      console.log('Using ticket for check-in:', {
+        tokenIdentifier,
+        nonce: ticketNonce,
+        data: `ESDTNFTTransfer@${tokenIdHex}@${nonceHex}@${amountHex}@${destHex}@${funcHex}`
+      });
+
+      const transaction = newTransaction({
+        value: '0',
+        data: `ESDTNFTTransfer@${tokenIdHex}@${nonceHex}@${amountHex}@${destHex}@${funcHex}`,
+        receiver: address, // For ESDTNFTTransfer, receiver is sender
+        gasLimit: 30000000, // Increased gas for NFT minting
+        gasPrice: GAS_PRICE,
+        chainID: network.chainId,
+        nonce: account.nonce,
+        sender: address,
+        version: VERSION
+      });
+
+      const newSessionId = await signAndSendTransactions({
+        transactions: [transaction],
+        callbackRoute,
+        transactionsDisplayInfo: USE_TICKET_INFO
+      });
+
+      sessionStorage.setItem(SESSION_KEY_USE_TICKET, newSessionId);
+      setSessionId(newSessionId);
+      return newSessionId;
+    },
+    [address, account.nonce, network.chainId, clearAllTransactions]
+  );
+
   return {
     buyTicket,
     createParticipant,
@@ -354,6 +427,7 @@ export const useFestivalTransactions = () => {
     putTicketForSale,
     buyResaleTicket,
     claimFlashEventPoints,
+    useTicket,
     transactionStatus,
     sessionId
   };

@@ -17,12 +17,16 @@ export interface FestivalData {
 }
 
 // Ticket price returned by getTicketPrices view function
-// Returns: MultiValueEncoded<(name, phase, price)>
+// Returns flat array with 6 items per price:
+// (name, phase, price, saleStart, saleEnd, ticketType)
 export interface TicketPrice {
   name: string;
   phase: string;
-  price: string; // BigUint as string in EGLD (with 18 decimals)
-  priceDisplay: string; // Human readable price
+  price: string; // BigUint as string in wei (18 decimals)
+  priceDisplay: string; // Human readable price in EGLD
+  saleStart?: number; // Unix timestamp - when this price becomes available
+  saleEnd?: number; // Unix timestamp - when this price ends
+  ticketType?: number; // 0 = Full Pass, 1 = Day Ticket
 }
 
 // Event within a festival returned by getEvents view function
@@ -40,6 +44,16 @@ export interface FlashEvent {
   startTime: number;
   endTime: number;
   bonusPoints: number;
+}
+
+// Product available for purchase at a festival
+export interface FestivalProduct {
+  productId: number;
+  name: string;
+  price: string; // BigUint as string in wei (18 decimals)
+  priceDisplay: string; // Human readable price in USD
+  description: string;
+  imageUrl: string;
 }
 
 // User/Participant data
@@ -69,7 +83,8 @@ export interface FestivalTax {
 
 // User's owned ticket (NFT)
 export interface OwnedTicketNFT {
-  tokenId: string; // e.g., "FEST-abc123"
+  tokenId: string; // Collection ID e.g., "FEST-abc123"
+  identifier?: string; // Full identifier with nonce e.g., "FEST-abc123-03"
   nonce: number;
   balance: string;
   name: string;
